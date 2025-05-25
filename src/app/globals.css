@@ -1,0 +1,590 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 95%; 
+    --foreground: 224 71% 4%; 
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+
+    --primary-hsl: 221 83% 53%; /* Default Blue HSL components */
+    --primary: hsl(var(--primary-hsl)); /* This is what components will use for color */
+    
+    --primary-foreground-hsl: 0 0% 100%; /* HSL components for white - can be changed by ThemeProvider */
+    --primary-foreground: hsl(var(--primary-foreground-hsl));
+
+    --secondary: 210 40% 93%;
+    --secondary-foreground: 224 71% 4%;
+
+    --muted: 210 40% 95%;
+    --muted-foreground: 215 28% 50%;
+    
+    --accent-hsl: var(--primary-hsl); /* Accent uses primary HSL by default */
+    --accent: hsl(var(--accent-hsl)); /* Accent color value derived from HSL */
+    --accent-foreground-hsl: var(--primary-foreground-hsl); /* Accent foreground uses primary foreground HSL */
+    --accent-foreground: hsl(var(--accent-foreground-hsl));
+
+    --destructive: 0 72% 51%; 
+    --destructive-foreground: hsl(var(--primary-foreground-hsl)); 
+
+    --border: 214 32% 88%;
+    --input: 214 32% 91%;
+    --ring-hsl: var(--primary-hsl); /* Ring uses primary HSL */
+    --ring: hsl(var(--ring-hsl));
+
+    /* Explicit Sidebar HSL Variables */
+    --sidebar-background-hsl: var(--background);
+    --sidebar-foreground-hsl: 0 0% 13%; 
+    --sidebar-border-hsl: 214 32% 85%; 
+    --sidebar-muted-foreground-hsl: 0 0% 40%; 
+    
+    --sidebar-accent-background-hsl: var(--primary-hsl);
+    --sidebar-accent-foreground-hsl: var(--primary-foreground-hsl);
+    --sidebar-primary-foreground-active-hsl: var(--primary-hsl); 
+    --sidebar-accent-foreground-hover-hsl: var(--primary-hsl);
+
+
+    --sidebar-destructive-background-hsl: var(--destructive); 
+    --sidebar-destructive-foreground-hsl: var(--destructive-foreground);
+
+
+    --radius: 0.75rem;
+    --chat-sidebar-width: 18rem; 
+    --chat-sidebar-collapsed-width: 3.5rem;
+
+
+    --chart-1: 12 76% 61%; /* Protein */
+    --chart-2: 173 58% 39%; /* Carbs */
+    --chart-3: 197 37% 24%; /* (Unused in calorie tracker) */
+    --chart-4: 43 74% 66%;  /* Fat */
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 224 20% 4%; 
+    --foreground: 210 40% 98%;
+
+    --card: 224 20% 7%; 
+    --card-foreground: 210 40% 98%;
+
+    --popover: 224 20% 7%;
+    --popover-foreground: 210 40% 98%;
+
+    /* --primary-hsl is set by JS or remains default */
+    /* --primary-foreground-hsl is set by JS based on --primary-hsl luminance */
+
+    --secondary: 224 20% 12%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 224 20% 9%;
+    --muted-foreground: 215 20% 65%;
+
+    /* --accent-hsl is derived from --primary-hsl */
+    /* --accent-foreground-hsl is derived from --primary-foreground-hsl */
+
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: hsl(var(--primary-foreground-hsl)); 
+
+    --border: 217 20% 18%;
+    --input: 217 20% 15%;
+    /* --ring-hsl is derived from --primary-hsl */
+
+    /* Explicit Dark Sidebar HSL Variables */
+    --sidebar-background-hsl: 224 20% 4%; 
+    --sidebar-foreground-hsl: 0 0% 95%; 
+    --sidebar-border-hsl: 217 20% 15%;
+    --sidebar-muted-foreground-hsl: 215 25% 70%; 
+    
+    --sidebar-accent-background-hsl: var(--primary-hsl);
+    --sidebar-accent-foreground-hsl: var(--primary-foreground-hsl); 
+    --sidebar-primary-foreground-active-hsl: var(--primary-hsl);
+    --sidebar-accent-foreground-hover-hsl: var(--primary-hsl);
+    
+    --sidebar-destructive-background-hsl: var(--destructive);
+    --sidebar-destructive-foreground-hsl: var(--destructive-foreground);
+
+
+    --chart-1: 12 70% 55%; /* Protein */
+    --chart-2: 150 60% 45%; /* Carbs */
+    --chart-3: 200 70% 50%;
+    --chart-4: 40 80% 55%; /* Fat */
+    --chart-5: 340 75% 55%;
+  }
+
+  /* Font Size Classes */
+  html.text-size-sm { @apply text-sm; }
+  html.text-size-default { @apply text-base; }
+  html.text-size-lg { @apply text-lg; }
+
+  /* High Contrast Mode - Light */
+  html.high-contrast {
+    --background: 255 100% 100%; 
+    --foreground: 0 0% 0%;     
+    --card: 255 100% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 255 100% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary-hsl: 0 0% 0%; 
+    --primary-foreground-hsl: 0 0% 100%; 
+    --secondary: 0 0% 90%; 
+    --secondary-foreground: 0 0% 0%;
+    --muted:  0 0% 90%;
+    --muted-foreground: 0 0% 20%; 
+    --accent-hsl: var(--primary-hsl);
+    --accent-foreground-hsl: var(--primary-foreground-hsl);
+    --border: 0 0% 0%; 
+    --input: 0 0% 90%;
+    --ring-hsl: var(--primary-hsl); 
+    --sidebar-background-hsl: var(--background);
+    --sidebar-foreground-hsl: 0 0% 0%;
+    --sidebar-border-hsl: 0 0% 0%;
+    --sidebar-muted-foreground-hsl: 0 0% 20%;
+    --sidebar-accent-background-hsl: 0 0% 0%; 
+    --sidebar-accent-foreground-hsl: 0 0% 100%; 
+    --sidebar-primary-foreground-active-hsl: 0 0% 0%;
+    --sidebar-accent-foreground-hover-hsl: 0 0% 0%; 
+  }
+
+  /* High Contrast Mode - Dark */
+  html.dark.high-contrast {
+    --background: 0 0% 0%;   
+    --foreground: 0 0% 100%; 
+    --card: 0 0% 0%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 0 0% 100%;
+    --primary-hsl: 60 100% 50%; 
+    --primary-foreground-hsl: 0 0% 0%; 
+    --secondary: 0 0% 15%; 
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 80%; 
+    --accent-hsl: var(--primary-hsl);
+    --accent-foreground-hsl: var(--primary-foreground-hsl);
+    --border: 0 0% 100%; 
+    --input: 0 0% 15%;
+    --ring-hsl: var(--primary-hsl);
+    --sidebar-background-hsl: var(--background);
+    --sidebar-foreground-hsl: 0 0% 100%;
+    --sidebar-border-hsl: 0 0% 100%;
+    --sidebar-muted-foreground-hsl: 0 0% 80%;
+    --sidebar-accent-background-hsl: 60 100% 50%; 
+    --sidebar-accent-foreground-hsl: 0 0% 0%; 
+    --sidebar-primary-foreground-active-hsl: 60 100% 50%;
+    --sidebar-accent-foreground-hover-hsl: 60 100% 50%;
+  }
+
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .glassmorphic {
+    @apply bg-card/75 backdrop-blur-md border border-border/20 shadow-lg transition-all duration-300;
+    border-radius: var(--radius);
+  }
+  .dark .glassmorphic {
+    @apply bg-card/65 backdrop-blur-lg border-border/15 shadow-xl; 
+  }
+  html.high-contrast .glassmorphic,
+  html.dark.high-contrast .glassmorphic {
+    @apply backdrop-blur-none bg-card border-border; 
+  }
+  
+  .glassmorphic-header {
+    @apply bg-background/75 dark:bg-background/75 backdrop-blur-lg shadow-md;
+  }
+  html.high-contrast .glassmorphic-header,
+  html.dark.high-contrast .glassmorphic-header {
+    @apply backdrop-blur-none bg-background shadow-none;
+  }
+
+  .chat-bubble {
+    @apply p-3 max-w-[75%] shadow-md transition-all duration-300 ease-out rounded-xl;
+  }
+  .chat-bubble-user {
+    @apply bg-primary text-primary-foreground ml-auto rounded-br-lg; 
+  }
+  .chat-bubble-ai {
+    @apply bg-card text-card-foreground mr-auto rounded-bl-lg glassmorphic border-border/10 shadow-lg;
+  }
+   .dark .chat-bubble-ai {
+     @apply bg-card/80 border-border/5;
+   }
+  
+  .chat-input-outer-wrapper {
+      @apply border-t border-border/20 bg-background/50 sticky bottom-0;
+  }
+  .chat-input-container {
+      @apply w-full;
+  }
+  .chat-input-card {
+      @apply glassmorphic p-1.5 sm:p-2 shadow-xl border-border/15 flex items-end gap-1.5 rounded-2xl; 
+  }
+  .dark .chat-input-card {
+      @apply border-border/10;
+  }
+  .chat-input-textarea {
+      @apply text-sm flex-1 bg-transparent border-none focus:ring-0 px-4 py-2.5 placeholder:text-muted-foreground/70;
+      line-height: 1.5;
+      min-height: calc(1.5em + 20px); 
+      max-height: calc(10 * 1.5em + 20px); 
+      resize: none;
+  }
+  .chat-disclaimer-chatpage {
+      @apply text-xs text-center mt-2.5 text-orange-600 dark:text-orange-500/90 font-medium flex items-center justify-center gap-1.5;
+  }
+
+  .removable-badge {
+    @apply relative pr-7 py-1.5 transition-all duration-150 ease-in-out;
+  }
+  .removable-badge .remove-icon {
+    @apply absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer hover:text-destructive scale-90 group-hover:scale-100 p-0.5 bg-card/80 dark:bg-card/90 rounded-full shadow;
+    transform-origin: center;
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .minimal-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .minimal-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+  .minimal-scrollbar:hover::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/40;
+  }
+
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border/70 rounded-full;
+  }
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/60;
+  }
+
+  /* Sidebar Component Styles */
+  .sidebar-component {
+    @apply fixed top-0 h-full flex flex-col transition-all ease-in-out z-[60];
+    width: var(--sidebar-current-width);
+    left: 0;
+    background-color: hsl(var(--sidebar-background-hsl) / 0.75);
+    @apply backdrop-blur-lg border-r border-[hsl(var(--sidebar-border-hsl))] shadow-xl;
+  }
+  html.high-contrast .sidebar-component,
+  html.dark.high-contrast .sidebar-component {
+    background-color: hsl(var(--sidebar-background-hsl)); 
+    @apply backdrop-blur-none border-r border-[hsl(var(--sidebar-border-hsl))];
+  }
+  
+  .sidebar-component.floating-sidebar { 
+    @apply shadow-2xl z-[100]; 
+  }
+
+  .sidebar-header-component {
+    @apply flex flex-col items-stretch gap-3 px-4 py-3.5 border-b border-[hsl(var(--sidebar-border-hsl))];
+    height: 4rem; /* Match AppHeader height */
+    box-sizing: border-box;
+  }
+  .sidebar-header-component-collapsed {
+    @apply !items-center !px-2.5 !py-3;
+  }
+
+  .sidebar-content-component {
+    @apply flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overflow-x-hidden p-3 custom-scrollbar;
+  }
+  .sidebar-content-component-collapsed {
+     @apply !items-center !px-2 !py-3;
+  }
+
+  .sidebar-footer-component {
+    @apply flex flex-col items-stretch gap-2 p-3 mt-auto border-t border-[hsl(var(--sidebar-border-hsl))];
+  }
+  .sidebar-footer-component-collapsed {
+    @apply !items-center !px-2 !py-2.5;
+  }
+
+  .sidebar-section-title-component {
+    @apply px-2.5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-muted-foreground-hsl))] transition-opacity duration-200;
+  }
+  .sidebar-section-title-component-collapsed {
+    @apply h-6 w-full flex justify-center my-1 items-center p-0; 
+  }
+  .sidebar-section-title-component-collapsed::before {
+    content: "";
+    @apply block h-px w-8 bg-[hsl(var(--sidebar-border-hsl))] opacity-50; 
+  }
+  .sidebar-section-title-component-collapsed > * {
+    @apply sr-only; 
+  }
+  
+  .sidebar-menu-item-component {
+    @apply relative flex w-full items-center gap-x-3.5 overflow-hidden rounded-lg px-3.5 py-3 text-left outline-none transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-[hsl(var(--sidebar-background-hsl))] disabled:pointer-events-none disabled:opacity-50 h-12 text-sm font-medium;
+    color: hsl(var(--sidebar-foreground-hsl)); 
+  }
+  .sidebar-menu-item-component > svg { 
+     color: hsl(var(--sidebar-foreground-hsl)); 
+  }
+
+  /* Default (inactive) hover state */
+  .sidebar-menu-item-component:not([data-active="true"]):not([data-variant="destructive"]):hover {
+    background-color: hsl(var(--sidebar-accent-background-hsl) / 0.15);
+    color: hsl(var(--sidebar-accent-foreground-hover-hsl));
+  }
+  .sidebar-menu-item-component:not([data-active="true"]):not([data-variant="destructive"]):hover > svg {
+    color: hsl(var(--sidebar-accent-foreground-hover-hsl));
+  }
+
+  /* Active state */
+  .sidebar-menu-item-component[data-active="true"] {
+    background-color: hsl(var(--sidebar-accent-background-hsl) / 0.2); 
+    color: hsl(var(--sidebar-primary-foreground-active-hsl));
+    @apply font-semibold;
+  }
+  .sidebar-menu-item-component[data-active="true"] > svg {
+     color: hsl(var(--sidebar-primary-foreground-active-hsl));
+  }
+  
+  /* Destructive variant */
+  .sidebar-menu-item-component[data-variant="destructive"] {
+    background-color: hsl(var(--sidebar-destructive-background-hsl) / 0.8); 
+    color: hsl(var(--sidebar-destructive-foreground-hsl));
+  }
+  .sidebar-menu-item-component[data-variant="destructive"]:hover {
+     background-color: hsl(var(--sidebar-destructive-background-hsl)); 
+  }
+  .sidebar-menu-item-component[data-variant="destructive"] > svg,
+  .sidebar-menu-item-component[data-variant="destructive"] > .menu-button-text {
+     color: hsl(var(--sidebar-destructive-foreground-hsl));
+  }
+  
+  .sidebar-menu-item-component > svg {
+    @apply shrink-0 h-5 w-5 transition-colors;
+  }
+  .menu-button-text { 
+    @apply flex-1 transition-opacity duration-200 ease-in-out opacity-100;
+  }
+
+  .sidebar-menu-item-component-collapsed {
+    @apply justify-center !px-0 !gap-0 aspect-square h-12 w-12;
+  }
+  .sidebar-menu-item-component-collapsed > .menu-button-text {
+    @apply opacity-0 max-w-0 overflow-hidden pointer-events-none sr-only;
+  }
+
+  .dashboard-widget-card {
+    @apply glassmorphic flex flex-col transition-all duration-300 ease-out relative overflow-hidden border-0 shadow-lg hover:shadow-xl;
+  }
+  .dark .dashboard-widget-card {
+     @apply hover:shadow-primary/20; 
+  }
+  .dashboard-widget-card .glassmorphic-content {
+     @apply bg-transparent p-3;
+  }
+  .dashboard-widget-card-header {
+     @apply flex flex-row items-start justify-between space-y-0 pb-2 pt-3 px-4;
+  }
+  .dashboard-widget-card-title {
+    @apply text-sm font-medium flex items-center gap-1.5 leading-snug; 
+  }
+   .dashboard-widget-card-title > svg:first-child { 
+    @apply h-4 w-4 shrink-0; 
+  }
+  .dashboard-widget-card-content {
+    @apply flex-grow flex flex-col justify-center p-3 pt-1;
+  }
+  .dashboard-widget-card-footer {
+    @apply text-xs text-muted-foreground pt-1 pb-2 px-4 flex justify-between items-center mt-auto border-t border-border/5; 
+  }
+  .dark .dashboard-widget-card-footer {
+    @apply border-border/10;
+  }
+
+  .sidebar-toggle-button {
+    @apply h-9 w-9 text-muted-foreground hover:text-primary;
+  }
+  .sidebar-toggle-button > svg {
+    @apply h-5 w-5;
+  }
+
+  .widget-editing .dashboard-widget-card { 
+    @apply outline-dashed outline-2 outline-primary/30 p-2 rounded-lg bg-primary/5;
+  }
+  .widget-edit-mode .dashboard-widget-card { 
+    @apply outline-dashed outline-2 outline-primary/30 p-2 rounded-lg bg-primary/5;
+  }
+  
+  .widget-editing { 
+    @apply ring-2 ring-primary/80 ring-offset-2 ring-offset-background shadow-2xl scale-[1.01] transition-all duration-200 cursor-grab;
+  }
+  .widget-dragging {
+    @apply opacity-75 scale-105 shadow-2xl z-50;
+  }
+
+  .logo-link-component {
+    @apply flex items-center gap-2.5 text-primary transition-all duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-[hsl(var(--sidebar-background-hsl))] rounded-md;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  .animate-fade-in-fast {
+    animation: fadeIn 0.25s ease-out forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fly-in-bottom-left {
+    animation: flyInBottomLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes flyInBottomLeft {
+    from { opacity: 0; transform: translate(-80%, 80%) scale(0.8); }
+    to { opacity: 1; transform: translate(0, 0) scale(1); }
+  }
+  .animate-fly-out-bottom-left {
+    animation: flyOutBottomLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes flyOutBottomLeft {
+    from { opacity: 1; transform: translate(0, 0) scale(1); }
+    to { opacity: 0; transform: translate(-80%, 80%) scale(0.8); }
+  }
+
+  .animate-fly-in-bottom-right {
+    animation: flyInBottomRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes flyInBottomRight {
+    from { opacity: 0; transform: translate(80%, 80%) scale(0.8); }
+    to { opacity: 1; transform: translate(0, 0) scale(1); }
+  }
+  .animate-fly-out-bottom-right {
+    animation: flyOutBottomRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  @keyframes flyOutBottomRight {
+    from { opacity: 1; transform: translate(0, 0) scale(1); }
+    to { opacity: 0; transform: translate(80%, 80%) scale(0.8); }
+  }
+
+  .draggable-item {
+    @apply cursor-grab active:cursor-grabbing;
+  }
+
+  .dashboard-grid-square {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-[minmax(150px,auto)] gap-4; /* Ensure min height for rows */
+    grid-auto-flow: dense;
+  }
+  
+  /* Masonry specific styles */
+  .dashboard-grid-masonry {
+    @apply w-full gap-4; 
+    column-gap: 1rem; /* Default gap for columns */
+    column-count: 1; /* Default to 1 column for smallest screens */
+    /* Removed responsive column-count from here; will be applied dynamically */
+    box-sizing: border-box; 
+    overflow-x: hidden; 
+  }
+  
+  .dashboard-grid-masonry > * { 
+    @apply break-inside-avoid mb-4 w-full; 
+  }
+  
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px hsla(var(--primary-hsl), 0.2);
+  }
+  .text-shadow {
+    text-shadow: 0 1px 3px hsla(var(--primary-hsl), 0.2), 0 1px 2px hsla(var(--primary-hsl), 0.2);
+  }
+  .text-shadow-md {
+    text-shadow: 0 4px 6px hsla(var(--primary-hsl), 0.2), 0 2px 4px hsla(var(--primary-hsl), 0.2);
+  }
+  .text-shadow-lg {
+    text-shadow: 0 10px 15px hsla(var(--primary-hsl), 0.2), 0 4px 6px hsla(var(--primary-hsl), 0.2);
+  }
+  .text-shadow-xl {
+    text-shadow: 0 20px 25px hsla(var(--primary-hsl), 0.2), 0 8px 10px hsla(var(--primary-hsl), 0.2);
+  }
+  .text-shadow-none {
+    text-shadow: none;
+  }
+}
+
+/* Z-index for Modals and Overlays */
+.dialog-overlay, .sheet-overlay {
+  z-index: 100 !important; 
+}
+.dialog-content, .sheet-content {
+  z-index: 110 !important;
+}
+.tooltip-content { /* For tooltips */
+  z-index: 120 !important;
+}
+
+/* Custom scrollbar for chat, applies to webkit browsers */
+.chat-scrollarea::-webkit-scrollbar {
+  width: 6px; /* Width of the scrollbar */
+}
+
+.chat-scrollarea::-webkit-scrollbar-track {
+  background: transparent; /* Make the track transparent */
+}
+
+.chat-scrollarea::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3); /* Thumb color with opacity */
+  border-radius: 10px; /* Rounded corners for the thumb */
+  border: 2px solid transparent; /* Optional: adds a little space around the thumb */
+  background-clip: content-box;  /* Ensures border doesn't make thumb thicker */
+}
+
+.chat-scrollarea::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5); /* Darker thumb on hover */
+}
+
+/* For Firefox */
+.chat-scrollarea {
+  scrollbar-width: thin; /* "auto" or "thin" */
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent; /* thumb and track color */
+}
+
+.chat-scrollarea:hover {
+   scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
+}
