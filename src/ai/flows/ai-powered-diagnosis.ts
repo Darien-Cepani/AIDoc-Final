@@ -17,16 +17,16 @@ const AiPoweredDiagnosisInputSchema = z.object({
   userProfileContext: z
     .string()
     .optional()
-    .describe('A summary of the user_s profile like age, gender, known conditions, and allergies, to be used as context.'),
+    .describe('A summary of the user_s profile like age, gender, known conditions, and allergies, and relevant consolidated summaries from documents and past chats to be used as context.'),
   userQuery: z.string().describe('The user query or question about their health.'),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'model']),
     content: z.string(),
-  })).optional().describe('Previous messages in the current conversation, if any.'),
+  })).optional().describe('Previous messages in the current conversation, if any (last 10 messages).'),
   attachedDocumentDataUri: z
     .string()
     .optional()
-    .describe("An optional attached document (e.g., medical report PDF, image of results) as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
+    .describe("An optional attached document (e.g., medical report PDF, image of results, video) as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   attachedDocumentName: z
     .string()
     .optional()
@@ -36,7 +36,7 @@ export type AiPoweredDiagnosisInput = z.infer<typeof AiPoweredDiagnosisInputSche
 
 const DiagnosisSourceSchema = z.object({
   title: z.string().describe('Title of the source or reference material.'),
-  url: z.string().describe('URL to the source material. Must be a valid URL.'), 
+  url: z.string().describe('URL to the source material. Must be a valid URL.'),
 });
 
 const PotentialConditionSchema = z.object({
@@ -62,27 +62,45 @@ const AiPoweredDiagnosisOutputSchema = z.object({
 export type AiPoweredDiagnosisOutput = z.infer<typeof AiPoweredDiagnosisOutputSchema>;
 
 export async function aiPoweredDiagnosis(input: AiPoweredDiagnosisInput): Promise<AiPoweredDiagnosisOutput> {
-  return aiPoweredDiagnosisFlow(input);
+  console.log('[aiPoweredDiagnosisFlow] Received input:', JSON.stringify(input, null, 2).substring(0, 500) + "..."); 
+  try {
+    const result = await aiPoweredDiagnosisFlow(input);
+    return result;
+  } catch (error: any) {
+    console.error('[aiPoweredDiagnosisFlow] Critical error in flow execution:', error);
+     return {
+        diagnosisResponse: "I'm sorry, a critical error occurred while processing your request. Please try again later or contact support if the issue persists.",
+        disclaimer: "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.",
+        chatTitleSuggestion: "Processing Error",
+        sources: [],
+        suggestedQuestions: [],
+        extractedSymptoms: [],
+        extractedConditions: [],
+        potentialConditions: [],
+        interpretedDocumentSummary: undefined,
+      };
+  }
 }
 
 const prompt = ai.definePrompt({
   name: 'aiPoweredDiagnosisPrompt',
   input: {schema: AiPoweredDiagnosisInputSchema},
   output: {schema: AiPoweredDiagnosisOutputSchema},
-  prompt: `You are an AI medical assistant. Your primary goal is to provide helpful, informative, and safe responses to user health queries. Engage in a conversational manner. You ONLY answer medical questions. If a non-medical question is asked, politely state that you can only assist with medical queries.
+  prompt: `You are AIDoc, an AI medical assistant. Your primary goal is to provide helpful, informative, and safe responses to user health queries. 
+Engage in a friendly, empathetic, and professional conversational manner.
 
 Context:
 {{#if userProfileContext}}
-- User's Profile Context: {{{userProfileContext}}}
+- User's Profile & Health Context: {{{userProfileContext}}}
 {{/if}}
 {{#if attachedDocumentName}}
 - Attached Document: {{{attachedDocumentName}}}
   {{#if attachedDocumentDataUri}}
-    (Document Content: {{media url=attachedDocumentDataUri}})
+    (Document Content for Interpretation: {{media url=attachedDocumentDataUri}})
   {{/if}}
 {{/if}}
 {{#if conversationHistory}}
-- Conversation History:
+- Recent Conversation History:
     {{#each conversationHistory}}
   - {{role}}: {{content}}
     {{/each}}
@@ -92,8 +110,11 @@ User Query: {{{userQuery}}}
 
 Your Task and Response Strategy:
 
-1.  **Medical Question Focus**:
-    *   If the query is NOT medical, set \`diagnosisResponse\` to "I can only assist with medical-related questions. How can I help you with your health today?" and skip other fields. Also set \`chatTitleSuggestion\` to "Non-Medical Query".
+0.  **Conversational Tone & Empathy**: Maintain a friendly, empathetic, and professional tone. If the user expresses positive well-being (e.g., "I'm feeling good today!"), acknowledge it positively (e.g., "That's great to hear! Is there anything specific health-related I can assist you with today, or any information you're looking for?"). If this is the start of a new chat, begin with a brief, friendly greeting.
+
+1.  **Medical Question Focus**: Medical questions include inquiries about symptoms, diseases, conditions, treatments, medications, test results, document interpretation, general health advice, nutrition, or exercise related to physical or mental well-being. 
+    *   If the current \`userQuery\` is clearly not medical (e.g., asking about the weather, politics, unrelated topics), set \`diagnosisResponse\` to "I can only assist with medical-related questions. How can I help you with your health today?" and set \`chatTitleSuggestion\` to "Non-Medical Query". Skip other analytical fields.
+    *   **However, if the query is a direct response to a question you asked or is a continuation of an established medical discussion (evident from \`conversationHistory\`), treat it as medical context.** Always re-evaluate the medical nature of the *current* \`userQuery\`.
 
 2.  **Information Gathering & Symptom Analysis (If Medical Query & Symptoms Discussed)**:
     *   Analyze the user's query, profile, document (if any), and conversation history.
@@ -104,7 +125,7 @@ Your Task and Response Strategy:
     *   If highest certainty is >= 85% OR the query is a general medical question not requiring deep personal diagnosis and further questions are not essential, you may provide more direct information instead of primarily asking questions.
 
 3.  **Document Interpretation**:
-    *   If a document was attached and is relevant, interpret its key findings related to the query and summarize them in \`interpretedDocumentSummary\`. This should be integrated into your \`diagnosisResponse\` if appropriate or presented as a distinct finding.
+    *   If a document was attached and is relevant, interpret its key findings related to the query and summarize them in \`interpretedDocumentSummary\`. This summary should be concise and in plain language. Integrate this into your \`diagnosisResponse\` if appropriate or present it as a distinct finding.
 
 4.  **Provide Information & Sources**:
     *   When discussing conditions, treatments, or general medical topics, provide information in \`diagnosisResponse\`.
@@ -116,13 +137,14 @@ Your Task and Response Strategy:
 Example Conversational Flow for Symptoms:
 User: "I have a headache and feel tired."
 AI: (Analyzes... low certainty for specific conditions yet)
-   \`diagnosisResponse\`: "I understand you have a headache and are feeling tired. To help me understand a bit more, could you tell me when these symptoms started and if you've noticed anything else, like a fever or nausea?"
+   \`diagnosisResponse\`: "I'm sorry to hear you're dealing with a headache and tiredness. To help me understand a bit more about what might be going on, could you tell me when these symptoms started and if you've noticed anything else, like a fever or nausea?"
    \`suggestedQuestions\`: ["When did these symptoms start?", "Have you noticed a fever or nausea?"]
    \`extractedSymptoms\`: ["headache", "tiredness"]
    \`potentialConditions\`: [{condition: "Common Cold", certainty: 30, explanation: "General viral symptoms", suggestedDoctorTypesForCondition: ["General Practitioner"]}, {condition: "Stress", certainty: 25, explanation: "Common causes of headache/fatigue", suggestedDoctorTypesForCondition: ["Psychologist", "Neurologist"]}]
    \`chatTitleSuggestion\`: "Headache and Fatigue"
 
 Prioritize safety and clarity. If uncertain or more information is needed for symptom queries, ask more questions.
+Do NOT include the general disclaimer in your \`diagnosisResponse\`; it's handled separately.
 `,
 });
 
@@ -135,33 +157,70 @@ const aiPoweredDiagnosisFlow = ai.defineFlow(
   async (input) => {
     const modelInput = { ...input };
     
-    const {output} = await prompt(modelInput);
-    if (!output) {
-      return {
-        diagnosisResponse: "I'm sorry, I encountered an issue and can't respond right now. Please try again later.",
-        disclaimer: "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.",
-        sources: [],
-        suggestedQuestions: [],
-        extractedSymptoms: [],
-        extractedConditions: [],
-        potentialConditions: [],
-        interpretedDocumentSummary: undefined,
-        chatTitleSuggestion: "AI Error",
-      };
+    try {
+      const {output} = await prompt(modelInput);
+      if (!output) {
+         console.error('[aiPoweredDiagnosisFlow] AI prompt returned no output for input:', JSON.stringify(modelInput, null, 2).substring(0, 300) + "...");
+        return {
+          diagnosisResponse: "I'm sorry, I couldn't generate a response at this time. Please try again.",
+          disclaimer: "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.",
+          chatTitleSuggestion: "AI Error",
+          sources: [],
+          suggestedQuestions: [],
+          extractedSymptoms: [],
+          extractedConditions: [],
+          potentialConditions: [],
+          interpretedDocumentSummary: undefined,
+        };
+      }
+      
+      const finalOutput = { ...output };
+      finalOutput.disclaimer = "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.";
+      
+      finalOutput.sources = finalOutput.sources || [];
+      finalOutput.suggestedQuestions = finalOutput.suggestedQuestions || [];
+      finalOutput.extractedSymptoms = finalOutput.extractedSymptoms || [];
+      finalOutput.extractedConditions = finalOutput.extractedConditions || [];
+      finalOutput.potentialConditions = finalOutput.potentialConditions || [];
+      finalOutput.chatTitleSuggestion = finalOutput.chatTitleSuggestion || (input.userQuery.substring(0, 30) + (input.userQuery.length > 30 ? "..." : ""));
+
+      // Ensure no undefined for arrays that might be accessed by client UI expecting arrays
+      if (!finalOutput.sources) finalOutput.sources = [];
+      if (!finalOutput.suggestedQuestions) finalOutput.suggestedQuestions = [];
+      if (!finalOutput.extractedSymptoms) finalOutput.extractedSymptoms = [];
+      if (!finalOutput.extractedConditions) finalOutput.extractedConditions = [];
+      if (!finalOutput.potentialConditions) finalOutput.potentialConditions = [];
+
+
+      return finalOutput;
+
+    } catch (flowError: any) {
+        console.error(`[aiPoweredDiagnosisFlow] Error during AI prompt execution for input: ${JSON.stringify(modelInput, null, 2).substring(0,300)}...`, flowError);
+        // Check if flowError itself has the structure of AiPoweredDiagnosisOutput for specific AI errors
+        if (flowError.diagnosisResponse !== undefined) {
+            return {
+                 diagnosisResponse: flowError.diagnosisResponse,
+                 disclaimer: flowError.disclaimer || "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.",
+                 chatTitleSuggestion: flowError.chatTitleSuggestion || "System Error",
+                 sources: flowError.sources || [],
+                 suggestedQuestions: flowError.suggestedQuestions || [],
+                 extractedSymptoms: flowError.extractedSymptoms || [],
+                 extractedConditions: flowError.extractedConditions || [],
+                 potentialConditions: flowError.potentialConditions || [],
+                 interpretedDocumentSummary: flowError.interpretedDocumentSummary,
+            };
+        }
+        return {
+            diagnosisResponse: "I'm sorry, I encountered an unexpected issue while trying to process your request. Please try again later.",
+            disclaimer: "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.",
+            chatTitleSuggestion: "System Error",
+            sources: [],
+            suggestedQuestions: [],
+            extractedSymptoms: [],
+            extractedConditions: [],
+            potentialConditions: [],
+            interpretedDocumentSummary: undefined,
+        };
     }
-    
-    const finalOutput = { ...output };
-    finalOutput.disclaimer = "This is an AI-generated response for informational purposes only and not a substitute for professional medical advice. Consult a qualified healthcare provider for any health concerns.";
-    
-    finalOutput.sources = finalOutput.sources || [];
-    finalOutput.suggestedQuestions = finalOutput.suggestedQuestions || [];
-    finalOutput.extractedSymptoms = finalOutput.extractedSymptoms || [];
-    finalOutput.extractedConditions = finalOutput.extractedConditions || [];
-    finalOutput.potentialConditions = finalOutput.potentialConditions || [];
-    finalOutput.chatTitleSuggestion = finalOutput.chatTitleSuggestion || (input.userQuery.substring(0, 30) + (input.userQuery.length > 30 ? "..." : ""));
-
-
-    return finalOutput;
   }
 );
-

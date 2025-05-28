@@ -87,7 +87,6 @@ function SidebarNavStructure() {
       <SidebarHeader className="h-16 border-b border-border/70">
         <div className={cn("flex items-center w-full", showText ? "justify-start" : "justify-center")}>
           <Logo collapsed={!showText} />
-          {/* Removed the toggle button from here as requested */}
         </div>
       </SidebarHeader>
       

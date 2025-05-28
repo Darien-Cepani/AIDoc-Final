@@ -1,23 +1,20 @@
 
 'use server';
 /**
- * @fileOverview Generates an overall health summary for a user by fetching their profile data,
- * consolidated document analysis summary, and consolidated chat summary from Firestore.
- * This information is then passed to an AI model for synthesis and formatting.
+ * @fileOverview Generates an overall health summary for a user based on consolidated chat and document insights.
  *
- * - generateOverallHealthSummary - Main exported function.
- * - GenerateOverallHealthSummaryInput - Input type for this flow (userId).
- * - GenerateOverallHealthSummaryOutput - Output type (summary, lastUpdated, and debug fields).
+ * - generateOverallHealthSummary - A function that synthesizes health data into a summary.
+ * - GenerateOverallHealthSummaryInput - Input type for the summary generation.
+ * - GenerateOverallHealthSummaryOutput - Output type for the summary generation.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+// Removed: import { doc, getDoc } from 'firebase/firestore';
+// Removed: import { db } from '@/lib/firebase';
 
-// Schema for the user profile data that will be passed to the AI prompt
-const UserProfileForAISchema = z.object({
-  name: z.string().optional().describe("User's name."),
+const UserProfileContextSchema = z.object({
+  name: z.string().optional().describe("User's name for personalization."),
   age: z.number().optional().nullable().describe("User's current age."),
   gender: z.string().optional().nullable().describe("User's gender."),
   height: z.number().optional().nullable().describe("User's height in cm."),
@@ -26,44 +23,39 @@ const UserProfileForAISchema = z.object({
   existingConditions: z.array(z.string()).optional().describe("User's known pre-existing medical conditions."),
   allergies: z.array(z.string()).optional().describe("User's known allergies."),
 });
-type UserProfileForAI = z.infer<typeof UserProfileForAISchema>;
+export type UserProfileDataForAI = z.infer<typeof UserProfileContextSchema>;
 
-// External input to the flow: just the userId
+
+// Input schema now expects consolidated summaries from the client
 const GenerateOverallHealthSummaryInputSchema = z.object({
-  userId: z.string().describe("The ID of the user for whom to generate the summary."),
-  // userProfile is now fetched internally based on userId
+  // userId: z.string().describe("The ID of the user for whom to generate the summary."), // No longer needed for summary fetching here
+  userProfile: UserProfileContextSchema.optional().describe("Key information from the user's health profile."),
+  consolidatedDocumentAnalysisSummary: z.string().nullable().optional().describe("A running summary of all analyzed medical documents."),
+  consolidatedChatSummary: z.string().nullable().optional().describe("A running summary of significant conclusions from AI chat sessions."),
 });
 export type GenerateOverallHealthSummaryInput = z.infer<typeof GenerateOverallHealthSummaryInputSchema>;
 
-// Output of the flow, including debug fields
 const GenerateOverallHealthSummaryOutputSchema = z.object({
   overallHealthSummary: z.string().describe("A holistic, easy-to-understand summary of the user's health, formatted with markdown."),
   lastUpdated: z.string().describe("ISO string timestamp of when this summary was generated."),
-  debug_fetchedDocSummary: z.string().optional().describe("DEBUG: Raw consolidated document summary fetched from Firestore."),
-  debug_fetchedChatSummary: z.string().optional().describe("DEBUG: Raw consolidated chat summary fetched from Firestore."),
-  debug_promptInputToAI: z.string().optional().describe("DEBUG: JSON string of the full input object sent to the AI prompt."),
 });
 export type GenerateOverallHealthSummaryOutput = z.infer<typeof GenerateOverallHealthSummaryOutputSchema>;
 
-// Main exported function
 export async function generateOverallHealthSummary(input: GenerateOverallHealthSummaryInput): Promise<GenerateOverallHealthSummaryOutput> {
   return generateOverallHealthSummaryFlow(input);
 }
 
-// Define specific placeholder strings
 const PLACEHOLDER_NO_DOC_SUMMARY = "NO_DOCUMENT_ANALYSIS_SUMMARY_AVAILABLE_FOR_REVIEW";
 const PLACEHOLDER_NO_CHAT_SUMMARY = "NO_AI_HEALTH_CHAT_SUMMARY_AVAILABLE_FOR_REVIEW";
 
-// Schema for the data object that will be passed to the AI prompt
-const AIPromptInputDataSchema = z.object({
-  userProfile: UserProfileForAISchema.optional(),
-  documentAnalysisContent: z.string().describe("Consolidated text from medical document analyses. This will be the actual summary or a specific placeholder if none exists."),
-  chatSessionContent: z.string().describe("Consolidated text from AI chat sessions. This will be the actual summary or a specific placeholder if none exists."),
-});
-
 const prompt = ai.definePrompt({
-  name: 'generateOverallHealthSummaryPrompt_v3',
-  input: { schema: AIPromptInputDataSchema },
+  name: 'generateOverallHealthSummaryPrompt_v3', // Renamed to reflect significant changes
+  input: { schema: z.object({
+      userProfile: UserProfileContextSchema.optional(),
+      documentAnalysisContent: z.string().describe("Consolidated text from medical document analyses. This will be the actual summary or a specific placeholder if none exists."),
+      chatSessionContent: z.string().describe("Consolidated text from AI chat sessions. This will be the actual summary or a specific placeholder if none exists."),
+    })
+  },
   output: { schema: z.object({ overallHealthSummary: z.string() }) }, // AI only generates the summary string
   prompt: `You are an AI medical data analyst. Your task is to generate a comprehensive, easy-to-understand overall health summary for a user, formatted using markdown.
 
@@ -133,87 +125,43 @@ If ALL three sources (User Profile is sparse, and Document Insights and Chat Ins
 
 const generateOverallHealthSummaryFlow = ai.defineFlow(
   {
-    name: 'generateOverallHealthSummaryFlow_v3',
-    inputSchema: GenerateOverallHealthSummaryInputSchema,
+    name: 'generateOverallHealthSummaryFlow',
+    inputSchema: GenerateOverallHealthSummaryInputSchema, // Expects userProfile and consolidated summaries from client
     outputSchema: GenerateOverallHealthSummaryOutputSchema,
   },
   async (input) => {
-    console.log('[generateOverallHealthSummaryFlow] Received input for userId:', input.userId);
+    console.log('[generateOverallHealthSummaryFlow] Received input:', JSON.stringify(input, null, 2).substring(0, 500) + "...");
 
-    let userProfileForAI: UserProfileForAI = {};
-    let docSummaryFromDb: string | null = null;
-    let chatSummaryFromDb: string | null = null;
-    let allUserData: any = null;
+    // Use summaries directly from input
+    const docSummaryFromClient = input.consolidatedDocumentAnalysisSummary;
+    const chatSummaryFromClient = input.consolidatedChatSummary;
 
-    if (input.userId) {
-      try {
-        const userDocRef = doc(db, 'users', input.userId);
-        const userDocSnap = await getDoc(userDocRef);
+    console.log('[generateOverallHealthSummaryFlow] docSummaryFromClient (received):', docSummaryFromClient);
+    console.log('[generateOverallHealthSummaryFlow] chatSummaryFromClient (received):', chatSummaryFromClient);
 
-        if (userDocSnap.exists()) {
-          console.log('[generateOverallHealthSummaryFlow] User document found in Firestore.');
-          allUserData = userDocSnap.data();
-          console.log('[generateOverallHealthSummaryFlow] Full userData from Firestore:', JSON.stringify(allUserData, null, 2));
-
-          // Populate userProfileForAI from fetched data
-          userProfileForAI = {
-            name: allUserData.name || undefined,
-            age: allUserData.age === undefined ? null : allUserData.age,
-            gender: allUserData.gender === undefined ? null : allUserData.gender,
-            height: allUserData.height === undefined ? null : allUserData.height,
-            weight: allUserData.weight === undefined ? null : allUserData.weight,
-            bmi: undefined, // Will be calculated if height and weight are present
-            existingConditions: allUserData.existingConditions || [],
-            allergies: allUserData.allergies || [],
-          };
-
-          if (userProfileForAI.height && userProfileForAI.weight && userProfileForAI.height > 0) {
-            const heightM = userProfileForAI.height / 100;
-            userProfileForAI.bmi = parseFloat((userProfileForAI.weight / (heightM * heightM)).toFixed(1));
-          }
-          
-          docSummaryFromDb = allUserData.consolidatedDocumentAnalysisSummary || null;
-          chatSummaryFromDb = allUserData.consolidatedChatSummary || null;
-
-          console.log('[generateOverallHealthSummaryFlow] Fetched docSummaryFromDb (from Firestore):', docSummaryFromDb);
-          console.log('[generateOverallHealthSummaryFlow] Fetched chatSummaryFromDb (from Firestore):', chatSummaryFromDb);
-
-        } else {
-          console.warn(`[generateOverallHealthSummaryFlow] User document not found for userId: ${input.userId}`);
-        }
-      } catch (error) {
-        console.error("[generateOverallHealthSummaryFlow] Error fetching user document:", error);
-      }
-    } else {
-        console.warn('[generateOverallHealthSummaryFlow] No userId provided in input.');
-    }
-
-    // Prepare content for the AI prompt, using placeholders if DB data is null/empty
-    const documentAnalysisContentForPrompt = (docSummaryFromDb && docSummaryFromDb.trim() !== "") ? docSummaryFromDb : PLACEHOLDER_NO_DOC_SUMMARY;
-    const chatSessionContentForPrompt = (chatSummaryFromDb && chatSummaryFromDb.trim() !== "") ? chatSummaryFromDb : PLACEHOLDER_NO_CHAT_SUMMARY;
+    const documentAnalysisContentForPrompt = (docSummaryFromClient && docSummaryFromClient.trim() !== "") ? docSummaryFromClient : PLACEHOLDER_NO_DOC_SUMMARY;
+    const chatSessionContentForPrompt = (chatSummaryFromClient && chatSummaryFromClient.trim() !== "") ? chatSummaryFromClient : PLACEHOLDER_NO_CHAT_SUMMARY;
 
     console.log('[generateOverallHealthSummaryFlow] documentAnalysisContentForPrompt (to AI):', documentAnalysisContentForPrompt);
     console.log('[generateOverallHealthSummaryFlow] chatSessionContentForPrompt (to AI):', chatSessionContentForPrompt);
 
-
-    const isProfileEffectivelyEmpty = !userProfileForAI.name && userProfileForAI.age === null && userProfileForAI.gender === null &&
-                                      (!userProfileForAI.existingConditions || userProfileForAI.existingConditions.length === 0) &&
-                                      (!userProfileForAI.allergies || userProfileForAI.allergies.length === 0);
+    const isProfileEffectivelyEmpty = !input.userProfile ||
+                                     (!input.userProfile.name?.trim() &&
+                                      (input.userProfile.age === undefined || input.userProfile.age === null) &&
+                                      !input.userProfile.gender?.trim() &&
+                                      (!input.userProfile.existingConditions || input.userProfile.existingConditions.length === 0) &&
+                                      (!input.userProfile.allergies || input.userProfile.allergies.length === 0));
 
     if (isProfileEffectivelyEmpty && documentAnalysisContentForPrompt === PLACEHOLDER_NO_DOC_SUMMARY && chatSessionContentForPrompt === PLACEHOLDER_NO_CHAT_SUMMARY) {
-      const noDataSummary = "A comprehensive health summary cannot be generated at this time due to insufficient information in your profile and no available insights from document analyses or chat sessions.\n\nDisclaimer: This summary is AI-generated for informational purposes only and is not a substitute for professional medical advice. Consult with a qualified healthcare provider for any health concerns.";
       console.log('[generateOverallHealthSummaryFlow] Bailing out early: Not enough data for summary.');
       return {
-        overallHealthSummary: noDataSummary,
+        overallHealthSummary: "A comprehensive health summary cannot be generated at this time due to insufficient information in your profile and no available insights from document analyses or chat sessions.\n\nDisclaimer: This summary is AI-generated for informational purposes only and is not a substitute for professional medical advice. Consult with a qualified healthcare provider for any health concerns.",
         lastUpdated: new Date().toISOString(),
-        debug_fetchedDocSummary: docSummaryFromDb || "",
-        debug_fetchedChatSummary: chatSummaryFromDb || "",
-        debug_promptInputToAI: JSON.stringify({ userProfile: userProfileForAI, documentAnalysisContent: documentAnalysisContentForPrompt, chatSessionContent: chatSessionContentForPrompt }, null, 2),
       };
     }
 
-    const promptInputData: z.infer<typeof AIPromptInputDataSchema> = {
-      userProfile: userProfileForAI,
+    const promptInputData = {
+      userProfile: input.userProfile,
       documentAnalysisContent: documentAnalysisContentForPrompt,
       chatSessionContent: chatSessionContentForPrompt,
     };
@@ -222,14 +170,10 @@ const generateOverallHealthSummaryFlow = ai.defineFlow(
     const {output: aiOutput} = await prompt(promptInputData);
 
     if (!aiOutput || !aiOutput.overallHealthSummary || aiOutput.overallHealthSummary.trim() === "") {
-      const failureSummary = "Could not generate an AI health summary at this time. This might be due to a temporary issue or lack of sufficient distinct information for synthesis.\n\nDisclaimer: This summary is AI-generated for informational purposes only and is not a substitute for professional medical advice. Consult with a qualified healthcare provider for any health concerns.";
       console.warn('[generateOverallHealthSummaryFlow] AI returned empty or no summary.');
       return {
-        overallHealthSummary: failureSummary,
+        overallHealthSummary: "Could not generate an AI health summary at this time. This might be due to a temporary issue or lack of sufficient distinct information for synthesis.\n\nDisclaimer: This summary is AI-generated for informational purposes only and is not a substitute for professional medical advice. Consult with a qualified healthcare provider for any health concerns.",
         lastUpdated: new Date().toISOString(),
-        debug_fetchedDocSummary: docSummaryFromDb || "",
-        debug_fetchedChatSummary: chatSummaryFromDb || "",
-        debug_promptInputToAI: JSON.stringify(promptInputData, null, 2),
       };
     }
     
@@ -244,9 +188,6 @@ const generateOverallHealthSummaryFlow = ai.defineFlow(
     return {
         overallHealthSummary: summaryText,
         lastUpdated: new Date().toISOString(),
-        debug_fetchedDocSummary: docSummaryFromDb || "",
-        debug_fetchedChatSummary: chatSummaryFromDb || "",
-        debug_promptInputToAI: JSON.stringify(promptInputData, null, 2),
     };
   }
 );

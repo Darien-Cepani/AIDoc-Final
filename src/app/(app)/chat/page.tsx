@@ -23,6 +23,7 @@ import { db } from '@/lib/firebase';
 import { collection, doc, addDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, Unsubscribe, setDoc, getDocs, writeBatch, updateDoc, limit } from 'firebase/firestore';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { FullMedicalChart } from '@/components/medical-chart/FullMedicalChart';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface Message {
@@ -39,13 +40,13 @@ interface Message {
 interface ChatSession {
   id: string;
   title: string;
-  messages: Message[]; // This will be populated by a separate listener
-  lastUpdated: Date; // Firestore Timestamp converted to Date
+  messages: Message[]; 
+  lastUpdated: Date; 
   currentSymptoms: string[];
   currentConditions: string[];
   currentDoctorTypes: string[];
   potentialConditionsContext: PotentialCondition[];
-  userProfileSnapshot?: string | null; // JSON string of user profile at chat creation
+  userProfileSnapshot?: string | null; 
 }
 
 interface MedicalChartModalProps {
@@ -69,7 +70,7 @@ const MedicalChartModal: React.FC<MedicalChartModalProps> = ({ isOpen, onClose, 
                 </ScrollArea>
                 <DialogModalFooter className="mt-auto">
                     <Button variant="outline" onClick={onClose}>Close</Button>
-                    <Button onClick={() => alert("PDF Download feature coming soon!")}><Download className="mr-2 h-4 w-4"/>Download Chart</Button>
+                    <Button onClick={() => toast({ title: "Coming Soon!", description: "PDF Download feature for the medical chart is under development.", iconType: "info"})}><Download className="mr-2 h-4 w-4"/>Download Chart</Button>
                 </DialogModalFooter>
             </DialogContent>
         </Dialog>
@@ -78,7 +79,7 @@ const MedicalChartModal: React.FC<MedicalChartModalProps> = ({ isOpen, onClose, 
 
 
 export default function ChatPage() {
-  const { user, updateUserProfile } = useAuth(); // Added updateUserProfile
+  const { user, updateUserProfile } = useAuth(); 
   const [userQuery, setUserQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -98,6 +99,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   const currentChatSession = useMemo(() => {
     return chatSessions.find(session => session.id === currentSessionId);
@@ -106,19 +108,19 @@ export default function ChatPage() {
 
   const generateUserProfileContextForAI = useCallback((): string => {
     if (!user) return "User profile not available.";
-    let context = `Age: ${user.age || 'N/A'}, Gender: ${user.gender || 'N/A'}. `;
+    let context = `Current User Profile:\nAge: ${user.age || 'N/A'}\nGender: ${user.gender || 'N/A'}.`;
     if (user.existingConditions && user.existingConditions.length > 0) {
-      context += `Known conditions: ${user.existingConditions.join(', ')}. `;
+      context += `\nKnown conditions: ${user.existingConditions.join(', ')}.`;
     }
     if (user.allergies && user.allergies.length > 0) {
-      context += `Allergies: ${user.allergies.join(', ')}. `;
+      context += `\nAllergies: ${user.allergies.join(', ')}.`;
     }
-    // Add consolidated summaries if available
+    
     if (user.consolidatedDocumentAnalysisSummary) {
-        context += `\n\nKey insights from user's medical documents (summarized): ${user.consolidatedDocumentAnalysisSummary}\n\n`;
+        context += `\n\nKey insights from user's medical documents (summarized):\n${user.consolidatedDocumentAnalysisSummary}`;
     }
     if (user.consolidatedChatSummary) {
-        context += `\n\nSummary of previous relevant chat conclusions: ${user.consolidatedChatSummary}\n\n`;
+        context += `\n\nSummary of previous relevant AI health chat conclusions:\n${user.consolidatedChatSummary}`;
     }
     return context.trim();
   }, [user]);
@@ -141,7 +143,7 @@ export default function ChatPage() {
           id: docSnap.id,
           title: data.title || "Untitled Chat",
           lastUpdated: (data.lastUpdated as Timestamp)?.toDate() || new Date(),
-          messages: [],
+          messages: [], // Messages are loaded separately
           currentSymptoms: data.currentSymptoms || [],
           currentConditions: data.currentConditions || [],
           currentDoctorTypes: data.currentDoctorTypes || [],
@@ -153,15 +155,24 @@ export default function ChatPage() {
       if (fetchedSessions.length > 0 && !currentSessionId) {
         setCurrentSessionId(fetchedSessions[0].id);
       } else if (fetchedSessions.length === 0) {
-        startNewChat();
+        startNewChat(); // Auto-start a new chat if none exist
       }
     }, (error) => {
       console.error("Error fetching chat sessions:", error);
+      toast({ title: "Error Loading Chats", description: "Could not load chat history.", variant: "destructive", iconType: "error" });
     });
 
     return () => unsubscribeSessions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id]); // Removed startNewChat to prevent potential loops
+
+   useEffect(() => {
+    if (chatSessions.length === 0 && user?.id && !isLoading && !currentSessionId) { // Ensure not already in a session
+      startNewChat();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatSessions, user?.id, isLoading, currentSessionId]);
+
 
   useEffect(() => {
     if (!currentSessionId || !user?.id) {
@@ -189,6 +200,7 @@ export default function ChatPage() {
       setMessages(fetchedMessages);
     }, (error) => {
       console.error(`Error fetching messages for session ${currentSessionId}:`, error);
+      toast({ title: "Error Loading Messages", description: `Could not load messages for the current chat.`, variant: "destructive", iconType: "error" });
     });
 
     return () => unsubscribeMessages();
@@ -197,8 +209,9 @@ export default function ChatPage() {
 
   const startNewChat = useCallback(async () => {
     if (!user?.id) return;
-    const newSessionId = `chat-${Date.now()}`;
-    const profileContextForAI = generateUserProfileContextForAI();
+    setIsLoading(true);
+    const newSessionId = `chat-${Date.now()}-${Math.random().toString(36).substring(2,7)}`;
+    const profileContextForAI = generateUserProfileContextForAI(); // Generate fresh context
     const newSessionData: Omit<ChatSession, 'id' | 'messages'> & { lastUpdated: Timestamp } = {
       title: `New Chat - ${new Date().toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
       lastUpdated: serverTimestamp() as Timestamp,
@@ -212,7 +225,7 @@ export default function ChatPage() {
     try {
       const newSessionRef = doc(db, `users/${user.id}/chatSessions`, newSessionId);
       await setDoc(newSessionRef, newSessionData);
-      setCurrentSessionId(newSessionId);
+      setCurrentSessionId(newSessionId); // This will trigger the useEffect for messages
       setUserQuery('');
       setSelectedFile(null);
       setFilePreview(null);
@@ -220,13 +233,15 @@ export default function ChatPage() {
       if (isHistoryModalOpen) setIsHistoryModalOpen(false);
     } catch (error) {
       console.error("Error starting new chat in Firestore:", error);
+      toast({ title: "Error Starting Chat", description: "Could not start a new chat session.", variant: "destructive", iconType: "error" });
+    } finally {
+      setIsLoading(false);
     }
   }, [user?.id, user?.existingConditions, generateUserProfileContextForAI, isHistoryModalOpen]);
 
 
   const addMessageToCurrentChat = async (messageData: Omit<Message, 'id' | 'timestamp'>, updatedContext?: Partial<Pick<ChatSession, 'currentSymptoms' | 'currentConditions' | 'currentDoctorTypes' | 'potentialConditionsContext' | 'title'>>) => {
     if (!currentSessionId || !user?.id || !user || !updateUserProfile) return;
-
 
     const messageRef = doc(collection(db, `users/${user.id}/chatSessions/${currentSessionId}/messages`));
     const finalMessageData = {
@@ -249,7 +264,8 @@ export default function ChatPage() {
       if (updatedContext) {
         const currentSessionForUpdate = chatSessions.find(s => s.id === currentSessionId);
         if(currentSessionForUpdate) {
-            if (updatedContext.title && currentSessionForUpdate.messages.length < 2) {
+             // Only update title if it's early in the chat (e.g. first AI response for this session)
+            if (updatedContext.title && messages.filter(m => m.role === 'model').length < 1) {
                  sessionUpdateData.title = updatedContext.title;
             }
             if (updatedContext.currentSymptoms) {
@@ -268,7 +284,6 @@ export default function ChatPage() {
       }
       await updateDoc(sessionDocRef, sessionUpdateData);
 
-      // Update consolidated chat summary if AI response is significant
       if (messageData.role === 'model' && messageData.aiResponse) {
         const aiResult = messageData.aiResponse;
         const significantConditions = (aiResult.potentialConditions || []).filter(pc => pc.certainty >= 85);
@@ -276,7 +291,7 @@ export default function ChatPage() {
         if (significantConditions.length > 0 || (aiResult.extractedSymptoms && aiResult.extractedSymptoms.length > 0)) {
           const newChatConclusionInput: NewChatConclusion = {
             chatDate: new Date().toISOString(),
-            aiIdentifiedPotentialConditions: significantConditions,
+            aiIdentifiedPotentialConditions: significantConditions.map(pc => ({condition: pc.condition, certainty: pc.certainty})),
             keySymptomsDiscussed: aiResult.extractedSymptoms || [],
             chatTitle: aiResult.chatTitleSuggestion || currentChatSession?.title || "Chat Conclusion",
           };
@@ -300,13 +315,14 @@ export default function ChatPage() {
             });
           } catch (summaryError) {
             console.error("Error updating consolidated chat summary:", summaryError);
-            // Optionally toast a warning
+            toast({ title: "Summary Error", description: "Could not update the consolidated chat summary.", variant: "destructive", iconType: "warning" });
           }
         }
       }
 
     } catch (error) {
       console.error("Error adding message to Firestore:", error);
+      toast({ title: "Message Error", description: "Could not save your message.", variant: "destructive", iconType: "error" });
     }
   };
 
@@ -316,30 +332,36 @@ export default function ChatPage() {
     const sessionIdToDelete = sessionToDelete.id;
 
     try {
+      // Delete all messages in the subcollection first
       const messagesCol = collection(db, `users/${user.id}/chatSessions/${sessionIdToDelete}/messages`);
-      const messagesQuery = query(messagesCol, limit(500));
+      const messagesQuery = query(messagesCol, limit(500)); // Process in batches of 500
       let messagesSnapshot = await getDocs(messagesQuery);
       while (messagesSnapshot.size > 0) {
           const batch = writeBatch(db);
           messagesSnapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
           await batch.commit();
-          if (messagesSnapshot.size < 500) break;
-          messagesSnapshot = await getDocs(messagesQuery);
+          if (messagesSnapshot.size < 500) break; // Exit if less than batch size processed
+          messagesSnapshot = await getDocs(messagesQuery); // Fetch next batch for very long chats
       }
 
+      // Then delete the session document itself
       await deleteDoc(doc(db, `users/${user.id}/chatSessions/${sessionIdToDelete}`));
+      toast({ title: "Chat Deleted", description: `Session "${sessionToDelete.title}" has been deleted.`, iconType: "success" });
 
+      // If the deleted session was the current one, switch to the most recent other session or start new
       if (currentSessionId === sessionIdToDelete) {
         const remainingSessions = chatSessions.filter(s => s.id !== sessionIdToDelete);
         if (remainingSessions.length > 0) {
+          // Sort by lastUpdated descending to pick the newest
           setCurrentSessionId(remainingSessions.sort((a,b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())[0].id);
         } else {
           startNewChat();
         }
       }
-      setSessionToDelete(null);
+      setSessionToDelete(null); // Close the confirmation dialog
     } catch (error) {
       console.error(`Error deleting session ${sessionIdToDelete}:`, error);
+      toast({ title: "Deletion Error", description: "Could not delete the chat session.", variant: "destructive", iconType: "error" });
     }
   };
 
@@ -347,13 +369,14 @@ export default function ChatPage() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
+      // Supported MIME types updated to include common video formats
       const allowedTypes = [
         "application/pdf", "image/jpeg", "image/png", "image/webp",
         "text/plain", "text/markdown",
-        "video/mp4", "video/webm", "video/quicktime", "video/ogg"
+        "video/mp4", "video/webm", "video/quicktime", "video/ogg" // Added video types
       ];
-      if (!allowedTypes.includes(file.type) || file.size > 10 * 1024 * 1024) {
-        alert("Unsupported file type or size too large (max 10MB). Videos should ideally be smaller.");
+      if (!allowedTypes.includes(file.type) || file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({ title: "Invalid File", description: "Unsupported file type or size too large (max 10MB). Videos should ideally be smaller.", variant: "destructive", iconType: "error" });
         return;
       }
       setSelectedFile(file);
@@ -363,11 +386,11 @@ export default function ChatPage() {
         reader.onloadend = () => { setFilePreview(reader.result as string); };
         reader.readAsDataURL(file);
       } else if (file.type === "application/pdf") {
-        setFilePreview("/pdf-icon.svg");
+        setFilePreview("/pdf-icon.svg"); // Generic PDF icon preview
       } else if (file.type.startsWith("video/")) {
-        setFilePreview(null);
+        setFilePreview(null); // No direct preview for video, just show name
       } else {
-        setFilePreview(null);
+        setFilePreview(null); // Other types, show name
       }
     }
   };
@@ -390,18 +413,28 @@ export default function ChatPage() {
     if (selectedFile) {
       fileName = selectedFile.name;
       currentAttachmentType = selectedFile.type;
-      fileDataUri = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile!);
-      });
+      try {
+        fileDataUri = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (error) => {
+            console.error("FileReader error:", error);
+            reject(new Error("Failed to read file."));
+          };
+          reader.readAsDataURL(selectedFile!); // reader.readAsDataURL(selectedFile) if selectedFile is guaranteed
+        });
+      } catch (fileReadError: any) {
+        console.error("Error reading file for data URI:", fileReadError);
+        toast({ title: "File Read Error", description: fileReadError.message || "Could not process the attached file.", variant: "destructive", iconType: "error" });
+        setIsLoading(false);
+        return;
+      }
     }
 
     await addMessageToCurrentChat({
       role: 'user', content: queryToSubmit,
       attachmentName: fileName,
-      attachmentPreviewUrl: currentAttachmentType?.startsWith("image/") ? fileDataUri : null,
+      attachmentPreviewUrl: currentAttachmentType?.startsWith("image/") ? fileDataUri : null, // Only store image previews
       attachmentType: currentAttachmentType,
     });
     setUserQuery(''); clearAttachment();
@@ -409,11 +442,11 @@ export default function ChatPage() {
     try {
       const conversationHistoryForAI = messages
         .filter(msg => msg.role === 'user' || msg.role === 'model')
-        .slice(-10)
+        .slice(-10) // Get last 10 messages for history
         .map(msg => ({ role: msg.role, content: msg.content }));
 
       const input: AiPoweredDiagnosisInput = {
-        userProfileContext: currentChatSession.userProfileSnapshot,
+        userProfileContext: currentChatSession.userProfileSnapshot, // Use snapshot for consistency within session
         userQuery: queryToSubmit, conversationHistory: conversationHistoryForAI,
         attachedDocumentDataUri: fileDataUri, attachedDocumentName: fileName,
       };
@@ -439,12 +472,14 @@ export default function ChatPage() {
         title: result.chatTitleSuggestion,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error getting AI diagnosis:", error);
+      const errorMessage = error.message || (error.diagnosisResponse ? error.diagnosisResponse : "Sorry, I couldn't process your request. Please try again.");
       await addMessageToCurrentChat({
         role: 'systemInfo',
-        content: "Sorry, I couldn't process your request. Please try again.",
+        content: errorMessage,
       });
+      toast({ title: "AI Error", description: errorMessage, variant: "destructive", iconType: "error" });
     } finally {
       setIsLoading(false); textareaRef.current?.focus();
     }
@@ -453,13 +488,13 @@ export default function ChatPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = 'auto'; // Reset height
       const scrollHeight = textareaRef.current.scrollHeight;
-      const singleLineHeight = parseFloat(getComputedStyle(textareaRef.current).lineHeight) || 24;
-      const maxHeight = 10 * singleLineHeight;
+      const singleLineHeight = parseFloat(getComputedStyle(textareaRef.current).lineHeight) || 24; 
+      const maxHeight = 10 * singleLineHeight; // Max height for 10 lines
 
-      let newHeight = Math.max(singleLineHeight, scrollHeight);
-      newHeight = Math.min(newHeight, maxHeight);
+      let newHeight = Math.max(singleLineHeight, scrollHeight); 
+      newHeight = Math.min(newHeight, maxHeight); 
 
       textareaRef.current.style.height = `${newHeight}px`;
       textareaRef.current.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
@@ -548,29 +583,50 @@ export default function ChatPage() {
     let updatePayload: Partial<ChatSession> = {};
     if (type === 'symptom') updatePayload.currentSymptoms = (sessionData.currentSymptoms || []).filter(s => s !== item);
     if (type === 'condition') updatePayload.currentConditions = (sessionData.currentConditions || []).filter(c => c !== item);
-    if (type === 'potentialCondition') updatePayload.potentialConditionsContext = (sessionData.potentialConditionsContext || []).filter(pc => pc.condition !== item);
+    if (type === 'potentialCondition') {
+      const updatedPotentialConditions = (sessionData.potentialConditionsContext || []).filter(pc => pc.condition !== item);
+      updatePayload.potentialConditionsContext = updatedPotentialConditions;
+      // Also update doctor types if any doctor type was only for this condition
+      const remainingDoctorTypes = new Set<string>();
+      updatedPotentialConditions.forEach(pc => {
+        pc.suggestedDoctorTypesForCondition?.forEach(dt => remainingDoctorTypes.add(dt));
+      });
+      updatePayload.currentDoctorTypes = Array.from(remainingDoctorTypes);
+    }
+
 
     try {
         await updateDoc(sessionDocRef, updatePayload);
+        toast({title: "Context Updated", description: `${type.charAt(0).toUpperCase() + type.slice(1)} "${item}" removed from current chat context.`, iconType: "info" });
     } catch (error) {
         console.error("Error removing context item from Firestore:", error);
+        toast({ title: "Update Error", description: "Could not update chat context.", variant: "destructive", iconType: "error" });
     }
   };
 
   const handleDownloadChat = () => {
-    alert("PDF Download feature coming soon! Will include medical chart, chat context, and summary.");
+    toast({ title: "Coming Soon!", description: "PDF Download feature for chat summary, context, and medical chart is under development.", iconType: "info" });
   };
 
   const CHAT_HUB_COLLAPSED_WIDTH = "md:w-12";
   const CHAT_HUB_OPEN_WIDTHS = "w-full md:w-[18rem] lg:w-[20rem] xl:w-[22rem]";
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100vh-4rem)]"> {/* Adjust height to account for header */}
 
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
         <ScrollArea className="flex-1 custom-scrollbar pr-2 chat-scrollarea">
           <div className="space-y-4 p-4">
+            {messages.length === 0 && !isLoading && currentSessionId && (
+              <div className={`flex justify-start animate-slide-up`}>
+                <div className={`chat-bubble chat-bubble-ai`}>
+                  <p className="whitespace-pre-wrap">Hello! I'm AIDoc, your AI health assistant. How can I help you today? Feel free to ask a health question, describe symptoms, or upload a medical document for interpretation.</p>
+                   <p className="text-xs opacity-70 mt-1.5 text-right">{formatDistanceToNowStrict(new Date(), { addSuffix: true })}</p>
+                </div>
+              </div>
+            )}
             {messages.map((msg) => (
                 <div key={msg.id} className={`flex animate-slide-up ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`chat-bubble ${msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`}>
@@ -580,19 +636,19 @@ export default function ChatPage() {
                 </div>
             ))}
             <div ref={messagesEndRef} />
-            {messages.length === 0 && !isLoading && (
+            {messages.length === 0 && !isLoading && !currentSessionId && ( // No current session ID implies initial loading state or no chats at all
               <div className="text-center text-muted-foreground py-8 flex flex-col items-center justify-center h-full">
                 <MessageSquare className="mx-auto h-16 w-16 mb-4 text-primary/50" />
-                <p className="text-lg">How can I help you today?</p>
-                <p className="text-sm mt-1">Ask a question, describe your symptoms, or upload a document.</p>
+                <p className="text-lg">Starting new chat or loading history...</p>
               </div>
             )}
-             {isLoading && messages.length === 0 && (
+             {isLoading && messages.length === 0 && ( // Loading state for when new chat is being created
                 <div className="flex justify-center items-center h-full"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </div>
             )}
           </div>
         </ScrollArea>
 
+        {/* Chat Input Area */}
         <div className="chat-input-outer-wrapper py-3 border-t border-border/30 bg-background/50">
             {selectedFile && (
                 <div className="mb-2 ml-2 text-xs p-2 bg-background/80 backdrop-blur-sm rounded-md flex justify-between items-center animate-fade-in-fast shadow-lg w-full max-w-xs">
@@ -618,7 +674,7 @@ export default function ChatPage() {
                                 handleSubmit();
                             }
                         }}
-                        rows={1}
+                        rows={1} 
                         className="chat-input-textarea minimal-scrollbar"
                         title="Press Enter to send, Ctrl+Enter or Shift+Enter for a new line."
                     />
@@ -638,14 +694,15 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <Card className={cn(
+      {/* Chat Hub Sidebar */}
+        <Card className={cn(
             "h-full flex flex-col glassmorphic shadow-xl transition-all duration-300 ease-in-out",
             isChatHubOpen ? `${CHAT_HUB_OPEN_WIDTHS} border-l border-border/20` : `${CHAT_HUB_COLLAPSED_WIDTH} p-0 border-l-0 md:border-l`,
-            !isChatHubOpen && "overflow-hidden"
+            !isChatHubOpen && "overflow-hidden" 
         )}>
           <CardHeader className={cn(
                 "pb-3 border-b border-border/30",
-                !isChatHubOpen && "p-1.5 flex flex-col items-center justify-center"
+                !isChatHubOpen && "p-1.5 flex flex-col items-center justify-center" 
             )}>
             <div className={cn("flex items-center", isChatHubOpen ? "justify-between" : "justify-center")}>
                 {isChatHubOpen && <CardTitle className="text-lg">Chat Hub</CardTitle>}
@@ -653,7 +710,7 @@ export default function ChatPage() {
                     {isChatHubOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
                 </Button>
             </div>
-             {isChatHubOpen && (
+             {isChatHubOpen && ( 
                 <div className="flex gap-2 mt-2">
                     <Button onClick={startNewChat} size="sm" className="flex-1 glassmorphic bg-primary text-primary-foreground hover:bg-primary/90">
                     <PlusCircle className="mr-2 h-4 w-4" /> New Chat
@@ -690,7 +747,7 @@ export default function ChatPage() {
                                 <div className="space-y-1.5">
                                 <h4 className="text-sm font-semibold mb-1 flex items-center"><Brain className="h-4 w-4 mr-2 text-primary" />Potential Conditions</h4>
                                 {currentChatSession.potentialConditionsContext.map((pc, i) => (
-                                    <div key={i} className={cn(`p-2 border rounded-md text-xs group removable-badge`, getCertaintyColorClasses(pc.certainty))}>
+                                    <div key={`${pc.condition}-${i}`} className={cn(`p-2 border rounded-md text-xs group removable-badge`, getCertaintyColorClasses(pc.certainty))}>
                                       <div className="flex justify-between items-start">
                                         <Link href={`https://www.google.com/search?q=${encodeURIComponent(pc.condition)}`} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">
                                             {pc.condition} <ExternalLink className="inline h-3 w-3 ml-0.5 opacity-70"/>
@@ -722,7 +779,7 @@ export default function ChatPage() {
                                 <h4 className="text-sm font-semibold mb-1 flex items-center"><AlertTriangle className="h-4 w-4 mr-2 text-primary" /> Extracted Symptoms</h4>
                                 <div className="flex flex-wrap gap-1.5">
                                 {currentChatSession.currentSymptoms.map((symptom, i) =>
-                                    <Badge key={i} variant="secondary" className="group removable-badge text-xs bg-amber-500/20 text-amber-700 border-amber-500/30 hover:bg-amber-500/30 dark:text-amber-300">
+                                    <Badge key={`${symptom}-${i}`} variant="secondary" className="group removable-badge text-xs bg-amber-500/20 text-amber-700 border-amber-500/30 hover:bg-amber-500/30 dark:text-amber-300">
                                     {symptom} <X className="remove-icon h-3.5 w-3.5" onClick={() => removeContextItem('symptom', symptom)} />
                                     </Badge>
                                 )}
@@ -735,7 +792,7 @@ export default function ChatPage() {
                                 <h4 className="text-sm font-semibold mb-1 flex items-center"><ListChecks className="h-4 w-4 mr-2 text-primary" /> Known Conditions</h4>
                                 <div className="flex flex-wrap gap-1.5">
                                 {currentChatSession.currentConditions.map((condition, i) =>
-                                    <Badge key={i} variant="outline" className="group removable-badge text-xs border-blue-500/50 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300">
+                                    <Badge key={`${condition}-${i}`} variant="outline" className="group removable-badge text-xs border-blue-500/50 bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-300">
                                     {condition} <X className="remove-icon h-3.5 w-3.5" onClick={() => removeContextItem('condition', condition)} />
                                     </Badge>
                                 )}
@@ -769,6 +826,7 @@ export default function ChatPage() {
           {!isChatHubOpen && <div className="flex-1" /> }
         </Card>
 
+        {/* Chat History Modal */}
         <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>
             <DialogContent className="sm:max-w-lg glassmorphic h-[70vh] flex flex-col">
                 <DialogHeader>
@@ -777,10 +835,10 @@ export default function ChatPage() {
                 </DialogHeader>
                 <ScrollArea className="flex-grow custom-scrollbar pr-2 -mr-2">
                     <div className="space-y-2 py-2">
-                        {chatSessions.length === 0 || chatSessions.every(s => s.messages.length === 0 && s.title.startsWith("New Chat")) ? (
+                        {chatSessions.length === 0 || chatSessions.every(s => s.title.startsWith("New Chat -")) ? (
                             <p className="text-sm text-muted-foreground text-center py-4">No chat history found.</p>
                         ) : (
-                            chatSessions.filter(s => !(s.messages.length === 0 && s.title.startsWith("New Chat"))).map(session => (
+                            chatSessions.filter(s => !s.title.startsWith("New Chat -") || s.messages.length > 0).map(session => ( // Show new chats if they have messages
                                 <div key={session.id} className="group flex items-center justify-between p-0.5 rounded-md hover:bg-accent/10 transition-colors">
                                     <Button
                                         variant="ghost"
@@ -809,6 +867,7 @@ export default function ChatPage() {
             </DialogContent>
         </Dialog>
 
+        {/* Delete Confirmation Alert Dialog */}
         {sessionToDelete && (
             <AlertDialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
                 <AlertDialogContent className="glassmorphic">
@@ -835,5 +894,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    

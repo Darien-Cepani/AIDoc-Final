@@ -15,7 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as DialogModalFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ import { dailyHealthInsight, type DailyHealthInsightOutput } from '@/ai/flows/da
 import { estimateMealCalories, type EstimateMealCaloriesOutput, type MacrosSchema as MealMacros } from '@/ai/flows/estimateMealCalories';
 import { Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import CustomWidgetFormContent from './_components/custom-widget-form';
+import CustomWidgetFormContent from './_components/custom-widget-form'; 
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast, type ToastVariantIcon } from '@/hooks/use-toast';
@@ -72,9 +72,9 @@ const Google = (props: React.SVGProps<SVGSVGElement>) => (
 
 type MetricSize = 'sm' | 'md' | 'lg';
 const widgetSizeClasses: Record<MetricSize, string> = {
-  sm: 'col-span-1 row-span-1 min-h-[150px]', 
-  md: 'col-span-2 row-span-1 md:col-span-1 lg:col-span-2 min-h-[150px]', 
-  lg: 'col-span-2 row-span-2 md:col-span-2 lg:col-span-4 min-h-[300px]', 
+  sm: 'col-span-1 row-span-1 min-h-[150px]',
+  md: 'col-span-2 row-span-1 md:col-span-1 lg:col-span-2 min-h-[150px]',
+  lg: 'col-span-2 row-span-2 md:col-span-2 lg:col-span-4 min-h-[300px]',
 };
 
 interface BaseMetricConfig {
@@ -82,7 +82,7 @@ interface BaseMetricConfig {
   title: string;
   category: string;
   description?: string;
-  iconName?: string | null; 
+  iconName?: string | null;
   dataKey?: string;
 }
 
@@ -105,7 +105,7 @@ export interface DashboardMetric extends BaseMetricConfig {
   listData?: Array<{label: string, value: string | number, iconName?: string}> | string[] | null;
   progressValue?: number | null;
   manualInputValue?: string | number | null;
-  manualInputValueLastUpdated?: Timestamp | null; // Added for daily reset logic
+  manualInputValueLastUpdated?: Timestamp | null;
   aiInsightData?: DailyHealthInsightOutput | null;
   bmiValue?: number | null;
   bmiCategory?: string | null;
@@ -113,9 +113,9 @@ export interface DashboardMetric extends BaseMetricConfig {
   dailyCalorieGoal?: number | null;
 
   manualInputType?: ManualInputType | null;
-  lastUpdated?: string | null;
+  lastUpdated?: string | null; // Display string for UI
   show7DayGraph?: boolean | null;
-  order?: number; 
+  order?: number;
 }
 
 export interface AvailableMetricConfig extends BaseMetricConfig {
@@ -128,28 +128,27 @@ export interface AvailableMetricConfig extends BaseMetricConfig {
 }
 
 
-export interface BmiHistoryEntry {
-  date: string; // ISO string
-  bmi: number;
-}
-
 export const iconMap: { [key: string]: React.ElementType } = {
   Activity, BarChart3, Brain, Lightbulb, Moon, Pill, Thermometer, TrendingUp, Droplet, Wand2, PlusCircle, Edit3, Sparkles, EyeOff, HelpCircle, LayoutGrid, DatabaseZap, Type, LineChartLucide, AreaChart, ListChecks, ActivitySquare, FileUp, MessageCircle, Edit, Save, Columns, Maximize2, Settings2, Minus, Plus, Wind, Target, Ruler, Scale, Flame, History, PieChartIcon, UserIconLucide, MedicalChartIcon
 };
 
 export const componentToIconName = (component?: React.ElementType): string | undefined => {
   if (!component) return undefined;
+  // Check if component is a forwardRef-wrapped Lucide icon (common pattern)
   if (typeof component === 'object' && component !== null && 'displayName' in component) {
-    return (component as any).displayName;
+    return (component as any).displayName; // e.g., "Activity"
   }
-  if (typeof component === 'function') return component.name;
+  // Fallback for simple function components if needed
+  if (typeof component === 'function') return component.name; // e.g., "Activity"
+
+  // Reverse lookup in iconMap (less reliable if names don't match exactly)
   for (const name in iconMap) { if (iconMap[name] === component) { return name; }}
   return undefined;
 };
 
 export const iconNameToComponent = (name?: string | null): React.ElementType | undefined => {
   if (!name) return undefined;
-  return iconMap[name] || HelpCircle; 
+  return iconMap[name] || HelpCircle; // Fallback to HelpCircle if name not found
 };
 
 
@@ -173,7 +172,6 @@ export const availableMetricsData: AvailableMetricConfig[] = [
 
 export type UserProfile = AuthUserType;
 
-const initialDashboardMetrics: DashboardMetric[] = [];
 
 const metricCategories = Array.from(new Set(availableMetricsData.map(m => m.category)));
 
@@ -188,15 +186,15 @@ const displayTypesForCustomWidget = [
 ];
 const dataSourcesForCustomWidget = [
     { value: 'manual' as DataSource, label: 'Manual Input', iconName: 'Edit3' },
-    { value: 'apple_health' as DataSource, label: 'Apple Health', iconName: 'Apple' }, 
-    { value: 'google_health' as DataSource, label: 'Google Health', iconName: 'Google' }, 
+    { value: 'apple_health' as DataSource, label: 'Apple Health', iconName: 'Apple' },
+    { value: 'google_health' as DataSource, label: 'Google Health', iconName: 'Google' },
     { value: 'document_analysis' as DataSource, label: 'Document Analysis', iconName: 'FileUp' },
 ];
 
 
 export interface MetricStyling {
   textClass: string;
-  iconName?: string;
+  iconName?: string | null;
   iconClass?: string;
   statusIconName?: string;
   statusIconClass?: string;
@@ -212,11 +210,11 @@ interface ManualEditModalProps {
 
 const ManualEditModal: React.FC<ManualEditModalProps> = ({ isOpen, onClose, metric, onSave }) => {
   const [inputValue, setInputValue] = useState<string | number>(metric.manualInputValue ?? (metric.manualInputType === 'number' || metric.manualInputType === 'hydration' || metric.manualInputType === 'steps' || metric.manualInputType === 'sleep' ? 0 : ''));
-  const Icon = iconNameToComponent(metric.iconName);
+  const IconComponent = iconNameToComponent(metric.iconName);
 
   useEffect(() => {
     setInputValue(metric.manualInputValue ?? (metric.manualInputType === 'number' || metric.manualInputType === 'hydration' || metric.manualInputType === 'steps' || metric.manualInputType === 'sleep' ? 0 : ''));
-  }, [isOpen, metric]);
+  }, [isOpen, metric.manualInputValue, metric.manualInputType]);
 
   const handleSave = () => {
     onSave(metric.id, inputValue);
@@ -239,11 +237,11 @@ const ManualEditModal: React.FC<ManualEditModalProps> = ({ isOpen, onClose, metr
       case 'number':
       case 'steps':
       case 'sleep':
-        return <Input type="number" value={String(inputValue)} onChange={(e) => setInputValue(e.target.value === '' ? 0 : Number(e.target.value))} placeholder={`Enter ${metric.title.toLowerCase()}`} className="glassmorphic text-center" prependIcon={Icon || Edit3}/>;
+        return <Input type="number" value={String(inputValue)} onChange={(e) => setInputValue(e.target.value === '' ? null : Number(e.target.value))} placeholder={`Enter ${metric.title.toLowerCase()}`} className="glassmorphic text-center" prependIcon={IconComponent || Edit3}/>;
       case 'text':
-        return <Input value={String(inputValue)} onChange={(e) => setInputValue(e.target.value)} placeholder={`Enter data for ${metric.title.toLowerCase()}`} className="glassmorphic" prependIcon={Icon || Edit3}/>;
+        return <Input value={String(inputValue)} onChange={(e) => setInputValue(e.target.value)} placeholder={`Enter data for ${metric.title.toLowerCase()}`} className="glassmorphic" prependIcon={IconComponent || Edit3}/>;
       default:
-        return <Input value={String(inputValue)} onChange={(e) => setInputValue(e.target.value)} placeholder="Enter data" className="glassmorphic" prependIcon={Icon || Edit3}/>;
+        return <Input value={String(inputValue)} onChange={(e) => setInputValue(e.target.value)} placeholder="Enter data" className="glassmorphic" prependIcon={IconComponent || Edit3}/>;
     }
   };
 
@@ -267,12 +265,10 @@ const ManualEditModal: React.FC<ManualEditModalProps> = ({ isOpen, onClose, metr
 
 const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, onUpdateMetric }: { metric: DashboardMetric; onDelete: (id: string) => void; onResize: (id: string, size: MetricSize) => void; onEdit: (metric: DashboardMetric) => void; onUpdateMetric: (id: string, data: Partial<DashboardMetric>) => void; }) => {
   const { user, updateUserProfile: authUpdateUserProfile } = useAuth();
-  const { getMetricStyling, renderMetricContent, toggle7DayGraph, isEditMode, contextHandleEditMetric, setIsCalorieHistoryModalOpen, calorieHistory, setIsBmiHistoryModalOpen, bmiHistory, handleAddMeal, handleRemoveMeal } = useDashboardPageLogic();
+  const { getMetricStyling, renderMetricContent, toggle7DayGraph, isEditMode, contextHandleEditMetric, setIsCalorieHistoryModalOpen, calorieHistory, setIsBmiHistoryModalOpen } = useDashboardPageLogic();
   const styling = getMetricStyling(metric);
 
-  const IconComponent = (metric.iconName && (typeof iconNameToComponent(metric.iconName) === 'function' || (typeof iconNameToComponent(metric.iconName) === 'object' && typeof (iconNameToComponent(metric.iconName) as any).render === 'function')))
-    ? iconNameToComponent(metric.iconName)
-    : HelpCircle;
+  const IconComponent = iconNameToComponent(metric.iconName) || HelpCircle;
 
 
   const showTopRightEditButton = (metric.type === 'manual-input' || metric.currentDataSource === 'manual') && metric.type !== 'calorie-tracker' && metric.type !== 'bmi';
@@ -280,13 +276,13 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
   const handleEditGoalForCalorieTracker = () => {
      contextHandleEditMetric({
       ...metric,
-      id: `${metric.id}-goal-edit`,
+      id: `${metric.id}-goal-edit`, 
       title: "Daily Calorie Goal",
       manualInputType: 'number',
       manualInputValue: metric.dailyCalorieGoal || user?.dailyCalorieGoal || 2000,
       unit: 'kcal',
-      type: 'manual-input',
-    } as DashboardMetric);
+      type: 'manual-input', 
+    } as DashboardMetric); 
   }
 
   return (
@@ -300,9 +296,9 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
     >
       <CardHeader className="dashboard-widget-card-header">
         <div className="min-w-0 flex-1 flex items-center gap-1.5">
-          {IconComponent && <IconComponent className={cn("h-4 w-4 shrink-0", styling.iconClass || "text-primary")} />}
+          <IconComponent className={cn("h-4 w-4 shrink-0", styling.iconClass || "text-primary")} />
           <CardTitle className="dashboard-widget-card-title">
-            <span className="truncate leading-snug">{metric.title}</span>
+             <span className="truncate leading-snug">{metric.title}</span>
           </CardTitle>
         </div>
 
@@ -326,7 +322,7 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
                     id: `weight-for-calorie-tracker-${metric.id}`, 
                     title: "Update Your Weight",
                     manualInputType: 'number',
-                    manualInputValue: user?.weight || 0,
+                    manualInputValue: user?.weight ?? 0,
                     unit: 'kg',
                     type: 'manual-input', 
                     iconName: 'Scale', 
@@ -361,7 +357,10 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
             </TooltipProvider>
             </>
           )}
-          {/* Removed BMI History button from card header */}
+          {metric.type === 'bmi' && !isEditMode && (
+            <div /> // Removed BMI history button from here
+          )}
+
 
           {isEditMode && (
             <>
@@ -374,7 +373,7 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
               <PopoverContent className="w-32 p-1 glassmorphic">
                 {(['sm', 'md', 'lg'] as MetricSize[]).map(size => {
                    const isCalorieTracker = metric.id.startsWith('calories_intake-');
-                   const isDisabled = isCalorieTracker && size !== 'lg'; 
+                   const isDisabled = isCalorieTracker && size !== 'lg';
                   return (
                     <Button
                       key={size}
@@ -416,7 +415,7 @@ const DashboardMetricCard = React.memo(({ metric, onDelete, onResize, onEdit, on
         </div>
       </CardHeader>
       <CardContent className="dashboard-widget-card-content">
-        {renderMetricContent(metric, onUpdateMetric, handleAddMeal, handleRemoveMeal, calorieHistory, bmiHistory)}
+        {renderMetricContent(metric, onUpdateMetric)}
       </CardContent>
     </Card>
   )
@@ -444,16 +443,16 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | 'category'>('category');
-  
+
   const [isEditMode, setIsEditMode] = useState(false);
-  const [dailyInsightData, setDailyInsightData] = useState<DailyHealthInsightOutput | null>(null); 
-  const [isInsightLoading, setIsInsightLoading] = useState(false); 
-  const [dashboardLayout, setDashboardLayout] = useState<'square' | 'masonry'>(user?.preferences?.dashboardLayout || 'square');
+  const [dailyInsightData, setDailyInsightData] = useState<DailyHealthInsightOutput | null>(null);
+  const [isInsightLoading, setIsInsightLoading] = useState(true);
+  const [dashboardLayout, setDashboardLayout] = useState<'square' | 'masonry'>('square');
   const [isFullChartModalOpen, setIsFullChartModalOpen] = useState(false);
 
 
   const [isBmiHistoryModalOpen, setIsBmiHistoryModalOpen] = useState(false);
-  const [bmiHistory, setBmiHistory] = useState<BmiHistoryEntry[]>([]); 
+  const [bmiHistory, setBmiHistory] = useState<AuthUserType['bmiHistory']>([]);
 
   const [isCalorieHistoryModalOpen, setIsCalorieHistoryModalOpen] = useState(false);
   const [calorieHistory, setCalorieHistory] = useState<StoredCalorieLog[]>([]);
@@ -461,6 +460,7 @@ export default function DashboardPage() {
   const [isFetchingMetrics, setIsFetchingMetrics] = useState(true);
   const [isEstimatingCalories, setIsEstimatingCalories] = useState(false);
   const { visualState: sidebarVisualState, isMobile, desktopBehavior } = useSidebar();
+  const [hasAttemptedDefaultMetricsCreation, setHasAttemptedDefaultMetricsCreation] = useState(false);
 
 
   useEffect(() => {
@@ -481,6 +481,49 @@ export default function DashboardPage() {
     }
   };
 
+  const getMetricStyling = useCallback((metric: DashboardMetric): MetricStyling => {
+    let status: 'bad' | 'warning' | 'good' | 'neutral' = 'neutral';
+    let numericValue = NaN;
+    let iconClassBase = "text-primary";
+
+    if (metric.isDataAvailable) {
+        const valToParse = metric.manualInputValue !== undefined && metric.manualInputValue !== null && String(metric.manualInputValue).trim() !== '' && metric.type !== 'calorie-tracker' && metric.type !== 'bmi'
+                           ? metric.manualInputValue
+                           : (metric.type === 'bmi' ? metric.bmiValue : String(metric.value).split(' ')[0]);
+
+        if (typeof valToParse === 'number') numericValue = valToParse;
+        else if (typeof valToParse === 'string' && !isNaN(parseFloat(valToParse))) numericValue = parseFloat(valToParse);
+    }
+
+    if (metric.manualInputType === 'hydration' && !isNaN(numericValue)) {
+        if (numericValue < 3) status = 'bad'; else if (numericValue < 6) status = 'warning'; else status = 'good';
+    } else if (metric.manualInputType === 'steps' && !isNaN(numericValue)) {
+        if (numericValue < 2000) status = 'bad'; else if (numericValue < 5000) status = 'warning'; else status = 'good';
+    } else if (metric.manualInputType === 'sleep' && !isNaN(numericValue)) {
+        if (numericValue < 6) status = 'bad'; else if (numericValue < 7) status = 'warning'; else if (numericValue <= 9) status = 'good'; else status = 'warning'; 
+    } else if (metric.id.startsWith('hr-') && metric.isDataAvailable && !isNaN(numericValue)) { 
+        if (numericValue < 50 || numericValue > 100) status = 'bad';
+        else if (numericValue < 60 || numericValue > 90) status = 'warning';
+        else status = 'good';
+    } else if (metric.id.startsWith('o2_sat-') && metric.isDataAvailable && !isNaN(numericValue)) { 
+        if (numericValue < 90) status = 'bad';
+        else if (numericValue < 94) status = 'warning';
+        else status = 'good';
+    } else if (metric.type === 'bmi' && metric.bmiValue) {
+        if (metric.bmiValue < 18.5 || metric.bmiValue >= 30) status = 'bad'; 
+        else if (metric.bmiValue >= 25 && metric.bmiValue < 30) status = 'warning'; 
+        else if (metric.bmiValue >=18.5 && metric.bmiValue < 25) status = 'good'; 
+    }
+
+
+    switch (status) {
+        case 'bad': return { textClass: 'text-destructive', iconClass: 'text-destructive', statusIconName: 'AlertTriangle', statusIconClass: 'text-destructive' };
+        case 'warning': return { textClass: 'text-orange-500 dark:text-orange-400', iconClass: 'text-orange-500 dark:text-orange-400', statusIconName: 'AlertTriangle', statusIconClass: 'text-orange-500 dark:text-orange-400' };
+        case 'good': return { textClass: 'text-green-600 dark:text-green-400', iconClass: 'text-green-600 dark:text-green-400', statusIconName: 'CheckCircle2', statusIconClass: 'text-green-600 dark:text-green-400' };
+        default: return { textClass: 'text-foreground', iconClass: iconClassBase };
+    }
+  }, []);
+
 
   const populateMetricData = useCallback((metric: DashboardMetric): DashboardMetric => {
      const populated = { ...metric };
@@ -495,7 +538,7 @@ export default function DashboardPage() {
             populated.isDataAvailable = false;
        }
      } else if (populated.type === 'bmi') {
-        if(user?.height && user?.weight && user.height > 0) { 
+        if(user?.height && user?.weight && user.height > 0) {
             const heightM = user.height / 100;
             const bmiVal = parseFloat((user.weight / (heightM * heightM)).toFixed(1));
             populated.bmiValue = bmiVal;
@@ -526,7 +569,7 @@ export default function DashboardPage() {
           populated.isDataAvailable = true;
         }
      } else if (populated.currentDataSource === 'document_analysis') {
-        populated.isDataAvailable = false; 
+        populated.isDataAvailable = false;
         populated.value = "No data from documents";
      } else if (populated.currentDataSource === 'apple_health' || populated.currentDataSource === 'google_health') {
         populated.isDataAvailable = false;
@@ -551,7 +594,7 @@ export default function DashboardPage() {
         populated.value = populated.isDataAvailable ? String(radialValue) : 'N/A';
     }
     return populated;
-  }, [user?.height, user?.weight, user?.dailyCalorieGoal, dailyInsightData]);
+  }, [user?.id, user?.height, user?.weight, user?.dailyCalorieGoal, dailyInsightData, getMetricStyling]);
 
 
   const fetchBmiHistory = useCallback(async () => {
@@ -560,13 +603,12 @@ export default function DashboardPage() {
     const q = query(bmiHistoryCol, orderBy("date", "desc"), limit(30));
     try {
       const snapshot = await getDocs(q);
-      const history = snapshot.docs.map(docSnap => docSnap.data() as BmiHistoryEntry);
+      const history = snapshot.docs.map(docSnap => docSnap.data() as AuthUserType['bmiHistory'][number]);
       setBmiHistory(history);
     } catch (error) {
       console.error("Error fetching BMI history:", error);
     }
   }, [user?.id]);
-
 
 
   const fetchCalorieHistory = useCallback(async () => {
@@ -577,14 +619,14 @@ export default function DashboardPage() {
       const snapshot = await getDocs(q);
       const history = snapshot.docs.map(docSnap => {
         const data = docSnap.data() as StoredCalorieLog;
-        const dailyMeals = Array.isArray(data.meals) ? data.meals.map(m => ({
+        const dailyMeals = Array.isArray(data.meals) ? data.meals.map((m: CalorieMealEntry) => ({
             ...m,
-            macros: m.macros || { protein: 0, carbs: 0, fat: 0 }, 
+            macros: m.macros || { protein: 0, carbs: 0, fat: 0 }, // Ensure macros exist
             healthinessScore: m.healthinessScore === undefined ? null : m.healthinessScore,
             healthinessNotes: m.healthinessNotes === undefined ? null : m.healthinessNotes,
             estimationNotes: m.estimationNotes === undefined ? null : m.estimationNotes,
         })) : [];
-        
+
         const dailyMacros = dailyMeals.reduce((acc, meal) => {
             acc.protein += meal.macros.protein;
             acc.carbs += meal.macros.carbs;
@@ -594,7 +636,7 @@ export default function DashboardPage() {
 
         return {
           ...data,
-          date: data.date, 
+          date: data.date,
           meals: dailyMeals,
           dailyProteinGrams: dailyMacros.protein,
           dailyCarbsGrams: dailyMacros.carbs,
@@ -606,6 +648,7 @@ export default function DashboardPage() {
       console.error("Error fetching calorie history:", error);
     }
   }, [user?.id]);
+
 
   useEffect(() => {
     if (isCalorieHistoryModalOpen && user?.id) {
@@ -628,7 +671,7 @@ export default function DashboardPage() {
     if (calorieWidget && calorieWidget.type === 'calorie-tracker') {
         const todayStr = formatISO(startOfDay(new Date()), { representation: 'date' });
         const totalCaloriesToday = (calorieWidget.dailyMeals || []).reduce((sum, meal) => sum + meal.estimatedCalories, 0);
-        
+
         const dailyMacros = (calorieWidget.dailyMeals || []).reduce((acc, meal) => {
             acc.protein += meal.macros.protein;
             acc.carbs += meal.macros.carbs;
@@ -645,9 +688,9 @@ export default function DashboardPage() {
                 description: m.description,
                 aiSuggestedMealName: m.aiSuggestedMealName,
                 estimatedCalories: m.estimatedCalories,
-                macros: m.macros || { protein: 0, carbs: 0, fat: 0 }, 
-                healthinessNotes: m.healthinessNotes === undefined ? null : m.healthinessNotes,
+                macros: m.macros || { protein: 0, carbs: 0, fat: 0 },
                 healthinessScore: m.healthinessScore === undefined ? null : m.healthinessScore,
+                healthinessNotes: m.healthinessNotes === undefined ? null : m.healthinessNotes,
                 estimationNotes: m.estimationNotes === undefined ? null : m.estimationNotes,
                 timestamp: m.timestamp || new Date().toISOString(),
             })),
@@ -669,16 +712,78 @@ export default function DashboardPage() {
     if (!user?.id) {
       setDashboardMetrics([]);
       setIsFetchingMetrics(false);
+      setHasAttemptedDefaultMetricsCreation(false);
       return;
     }
+    if (user.id !== (dashboardMetrics[0]?.id.split('-')[0] || '')) { 
+      setHasAttemptedDefaultMetricsCreation(false);
+    }
+
     setIsFetchingMetrics(true);
     const metricsCol = collection(db, `users/${user.id}/dashboardMetrics`);
     const q = query(metricsCol, orderBy("order", "asc"));
 
     const unsubscribeMetrics = onSnapshot(q, async (snapshot) => {
-      if (snapshot.empty) {
-        setDashboardMetrics([]); 
-        setIsFetchingMetrics(false);
+      if (snapshot.empty && !hasAttemptedDefaultMetricsCreation) {
+        setIsFetchingMetrics(true);
+        console.log("No metrics found, creating defaults for user:", user.id);
+        setHasAttemptedDefaultMetricsCreation(true);
+        const defaultMetricsToAdd = availableMetricsData.filter(
+          am => ['ai_health_tip', 'hydration', 'calories_intake', 'bmi'].includes(am.id)
+        ).map((am, index) => {
+          const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+          const newMetricId = `${am.id}-${uniqueSuffix}`;
+
+          const baseMetric: Omit<DashboardMetric, 'value' | 'isDataAvailable' | 'lastUpdated'> = {
+            id: newMetricId,
+            title: am.title,
+            category: am.category,
+            description: am.description,
+            iconName: am.iconName || null,
+            unit: am.defaultUnit === undefined ? null : am.defaultUnit,
+            type: am.defaultType,
+            size: am.id === 'calories_intake' ? 'lg' : am.defaultSize || 'md',
+            possibleDataSources: am.possibleDataSources,
+            currentDataSource: am.defaultDataSource,
+            manualInputType: am.manualInputType === undefined ? undefined : am.manualInputType,
+            dataKey: am.dataKey || 'value',
+            manualInputValue: (am.manualInputType === 'number' || am.manualInputType === 'hydration' || am.manualInputType === 'steps' || am.manualInputType === 'sleep') ? 0 : '',
+            manualInputValueLastUpdated: am.manualInputType === 'hydration' ? serverTimestamp() as Timestamp : null,
+            dailyCalorieGoal: am.id === 'calories_intake' ? (user?.dailyCalorieGoal || 2000) : null,
+            dailyMeals: am.id === 'calories_intake' ? [] : null,
+            order: index,
+            chartConfig: am.defaultType.includes('chart') ? { [am.dataKey || 'value']: { label: am.title, color: `hsl(var(--primary-hsl))` } } : null,
+            bmiValue: null,
+            bmiCategory: null,
+            aiInsightData: null,
+            chartData: null,
+            listData: null,
+            progressValue: null,
+          };
+          return populateMetricData(baseMetric as DashboardMetric);
+        });
+
+        const batch = writeBatch(db);
+        defaultMetricsToAdd.forEach(metric => {
+            const { lastUpdated, ...metricToSave } = metric; 
+            const firestoreMetricData: { [key: string]: any } = { ...metricToSave, lastUpdated: serverTimestamp() };
+            Object.keys(firestoreMetricData).forEach(key => {
+              const typedKey = key as keyof DashboardMetric;
+              if (firestoreMetricData[typedKey] === undefined) {
+                firestoreMetricData[typedKey] = null;
+              }
+            });
+            const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${metric.id}`);
+            batch.set(metricDocRef, firestoreMetricData);
+        });
+        try {
+            await batch.commit();
+            console.log("Default metrics committed for user:", user.id);
+        } catch (error) {
+            console.error("Error saving default metrics:", error);
+            setDashboardMetrics([]); 
+            setIsFetchingMetrics(false);
+        }
       } else {
         let fetchedMetrics = snapshot.docs.map((docSnap, index) => {
           const data = docSnap.data();
@@ -716,34 +821,35 @@ export default function DashboardPage() {
         });
 
         const today = startOfDay(new Date());
-        const batch = writeBatch(db);
-        let batchHasWrites = false;
+        const resetBatch = writeBatch(db);
+        let resetBatchHasWrites = false;
 
         fetchedMetrics = fetchedMetrics.map(metric => {
-          if (metric.type === 'manual-input' && metric.manualInputType === 'hydration' && metric.manualInputValueLastUpdated) {
-            const lastUpdatedDate = metric.manualInputValueLastUpdated.toDate();
+          let populatedMetric = populateMetricData(metric);
+          if (populatedMetric.type === 'manual-input' && populatedMetric.manualInputType === 'hydration' && populatedMetric.manualInputValueLastUpdated) {
+            const lastUpdatedDate = populatedMetric.manualInputValueLastUpdated.toDate();
             if (startOfDay(lastUpdatedDate) < today) {
-              batch.update(doc(db, `users/${user.id}/dashboardMetrics/${metric.id}`), {
+              const updatedFields = {
                 manualInputValue: 0,
                 manualInputValueLastUpdated: serverTimestamp()
-              });
-              batchHasWrites = true;
-              return { ...metric, manualInputValue: 0, manualInputValueLastUpdated: Timestamp.now() };
+              };
+              resetBatch.update(doc(db, `users/${user.id}/dashboardMetrics/${metric.id}`), updatedFields);
+              resetBatchHasWrites = true;
+              return { ...populatedMetric, ...updatedFields, value: '0 cups (0 mL)' };
             }
           }
-          return metric;
+          return populatedMetric;
         });
 
-        if (batchHasWrites) {
+        if (resetBatchHasWrites) {
           try {
-            await batch.commit();
-            // Firestore listener will update state, or we can re-fetch/manually update here
+            await resetBatch.commit();
           } catch (error) {
             console.error("Error resetting hydration logs in batch:", error);
           }
         }
-        
-        setDashboardMetrics(fetchedMetrics.map(m => populateMetricData(m)));
+
+        setDashboardMetrics(fetchedMetrics);
       }
       setIsFetchingMetrics(false);
     }, (error) => {
@@ -752,19 +858,17 @@ export default function DashboardPage() {
       setDashboardMetrics([]);
     });
     return () => {
-      if (unsubscribeMetrics) {
-        unsubscribeMetrics();
-      }
+      unsubscribeMetrics();
     };
-  }, [user?.id, populateMetricData]);
+  }, [user?.id, populateMetricData, hasAttemptedDefaultMetricsCreation]);
 
 
   const fetchDailyInsight = useCallback(async () => {
-    if (!user?.id) { 
+    if (!user?.id) {
       setIsInsightLoading(false);
       return;
     }
-    setIsInsightLoading(true);
+    
     const todayString = new Date().toDateString();
     const insightKey = `aidoc-dashboard-dailyInsight-${user.id}-${todayString}`;
 
@@ -774,7 +878,7 @@ export default function DashboardPage() {
             const parsed = JSON.parse(cachedData) as DailyHealthInsightOutput;
             if (parsed && parsed.healthTip && parsed.inspirationalQuote) {
                 setDailyInsightData(parsed);
-                setIsInsightLoading(false);
+                setIsInsightLoading(false); // Ensure loading is set to false if cached data is used
                 return;
             }
         } catch(e) {
@@ -783,6 +887,7 @@ export default function DashboardPage() {
         }
     }
     
+    setIsInsightLoading(true); // Set loading true only if fetching new
     try {
         const newInsight = await dailyHealthInsight({ userName: user.name || 'User', healthContext: "User wants to improve general well-being." });
         setDailyInsightData(newInsight);
@@ -791,7 +896,7 @@ export default function DashboardPage() {
         }
     } catch (error) {
         console.error("Failed to fetch daily insight for dashboard:", error);
-        const fallbackInsight = { healthTip: "Could not load tip. Focus on staying hydrated!", inspirationalQuote: "Every day is a new beginning." };
+        const fallbackInsight = { healthTip: "Remember to drink plenty of water today!", inspirationalQuote: "The journey of a thousand miles begins with a single step. - Lao Tzu" };
         setDailyInsightData(fallbackInsight);
     } finally {
         setIsInsightLoading(false);
@@ -800,10 +905,10 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    const hasAiInsightWidget = dashboardMetrics.some(m => m.id.startsWith('ai_health_tip'));
-    const aiInsightWidget = dashboardMetrics.find(m => m.id.startsWith('ai_health_tip'));
+    const hasAiInsightWidget = dashboardMetrics.some(m => m.id.startsWith('ai_health_tip-'));
+    const aiInsightWidget = dashboardMetrics.find(m => m.id.startsWith('ai_health_tip-'));
 
-    if (hasAiInsightWidget && user && (!aiInsightWidget?.aiInsightData || (aiInsightWidget && !isInsightLoading && !dailyInsightData))) {
+    if (hasAiInsightWidget && user && (!dailyInsightData || (aiInsightWidget && !aiInsightWidget.aiInsightData && !isInsightLoading) ) ) {
       fetchDailyInsight();
     } else if (!hasAiInsightWidget && dailyInsightData) {
         setDailyInsightData(null);
@@ -851,7 +956,7 @@ export default function DashboardPage() {
       category: metricConfig.category,
       description: metricConfig.description,
       iconName: metricConfig.iconName || null,
-      unit: metricConfig.unit === undefined ? null : metricConfig.unit,
+      unit: metricConfig.defaultUnit === undefined ? null : metricConfig.defaultUnit,
       type: metricConfig.defaultType,
       size: metricConfig.id === 'calories_intake' ? 'lg' : metricConfig.defaultSize || 'md',
       possibleDataSources: metricConfig.possibleDataSources,
@@ -860,7 +965,7 @@ export default function DashboardPage() {
       show7DayGraph: false,
       dataKey: metricConfig.dataKey || 'value',
       manualInputValue: (metricConfig.manualInputType === 'number' || metricConfig.manualInputType === 'hydration' || metricConfig.manualInputType === 'steps' || metricConfig.manualInputType === 'sleep') ? 0 : '',
-      manualInputValueLastUpdated: metricConfig.manualInputType === 'hydration' ? serverTimestamp() : null,
+      manualInputValueLastUpdated: metricConfig.manualInputType === 'hydration' ? serverTimestamp() as Timestamp : null,
       dailyCalorieGoal: metricConfig.id === 'calories_intake' ? (user?.dailyCalorieGoal || 2000) : null,
       dailyMeals: metricConfig.id === 'calories_intake' ? [] : null,
       chartConfig: metricConfig.defaultType.includes('chart') ? { [metricConfig.dataKey || 'value']: { label: metricConfig.title, color: `hsl(var(--primary-hsl))` } } : null,
@@ -874,39 +979,29 @@ export default function DashboardPage() {
     };
 
     const populatedNewMetric = populateMetricData(newMetricBase as DashboardMetric);
-    const finalNewMetric: DashboardMetric = {
-        ...populatedNewMetric,
-        lastUpdated: format(new Date(), 'p, MMM d'),
-    };
-
-    const firestoreMetricData: { [key: string]: any } = { ...finalNewMetric };
-    delete firestoreMetricData.lastUpdated; 
-    firestoreMetricData.lastUpdated = serverTimestamp(); 
+    const { lastUpdated: displayLastUpdated, ...metricToSave } = populatedNewMetric;
+    const firestoreMetricData: { [key: string]: any } = { ...metricToSave, lastUpdated: serverTimestamp() };
 
     Object.keys(firestoreMetricData).forEach(key => {
       const typedKey = key as keyof DashboardMetric;
       if (firestoreMetricData[typedKey] === undefined) {
         firestoreMetricData[typedKey] = null;
       }
-      if (typedKey === 'unit' && firestoreMetricData[typedKey] === undefined) {
-        firestoreMetricData[typedKey] = null;
-      }
-      if (typedKey === 'manualInputValueLastUpdated' && metricConfig.manualInputType !== 'hydration') {
-         firestoreMetricData[typedKey] = null; // Only set for hydration initially
-      }
     });
 
 
     try {
-        const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${finalNewMetric.id}`);
+        const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${populatedNewMetric.id}`);
         await setDoc(metricDocRef, firestoreMetricData);
     } catch (error) {
         console.error("Error adding metric to Firestore:", error);
+        toast({ title: "Error", description: "Could not add metric to dashboard.", variant: "destructive", iconType: "error" });
     }
   };
 
   const handleAddCustomMetric = async () => {
     if (!user?.id || !newCustomWidget.title || !newCustomWidget.type || !newCustomWidget.currentDataSource) {
+        toast({ title: "Missing Information", description: "Please fill out all required fields for the custom widget.", variant: "destructive", iconType: "warning" });
         return;
     }
     const baseMetricConfig = availableMetricsData.find(m => m.id === newCustomWidget.id?.split('-')[0]);
@@ -926,7 +1021,7 @@ export default function DashboardPage() {
         manualInputType: newCustomWidget.currentDataSource === 'manual' ? (newCustomWidget.manualInputType === undefined ? undefined : (newCustomWidget.manualInputType || baseMetricConfig?.manualInputType || 'text')) : undefined,
         dataKey: newCustomWidget.dataKey || baseMetricConfig?.dataKey || 'value',
         manualInputValue: (newCustomWidget.manualInputType === 'number' || newCustomWidget.manualInputType === 'hydration' || newCustomWidget.manualInputType === 'steps' || newCustomWidget.manualInputType === 'sleep') ? 0 : '',
-        manualInputValueLastUpdated: newCustomWidget.manualInputType === 'hydration' ? serverTimestamp() : null,
+        manualInputValueLastUpdated: newCustomWidget.manualInputType === 'hydration' ? serverTimestamp() as Timestamp : null,
         chartConfig: newCustomWidget.type?.includes('chart') ? { [newCustomWidget.dataKey || 'value']: { label: newCustomWidget.title!, color: `hsl(var(--primary-hsl))` } } : null,
         dailyCalorieGoal: null,
         dailyMeals: null,
@@ -940,34 +1035,24 @@ export default function DashboardPage() {
         order: dashboardMetrics.length,
     };
     const populatedCustomMetric = populateMetricData(customMetricBase as DashboardMetric);
-    const finalCustomMetric: DashboardMetric = {
-        ...populatedCustomMetric,
-        lastUpdated: format(new Date(), 'p, MMM d'),
-    };
-
-    const firestoreMetricData: { [key: string]: any } = { ...finalCustomMetric };
-    delete firestoreMetricData.lastUpdated; 
-    firestoreMetricData.lastUpdated = serverTimestamp(); 
+    const { lastUpdated: displayLastUpdated, ...metricToSave } = populatedCustomMetric;
+    const firestoreMetricData: { [key: string]: any } = { ...metricToSave, lastUpdated: serverTimestamp() };
 
     Object.keys(firestoreMetricData).forEach(key => {
         const typedKey = key as keyof DashboardMetric;
         if (firestoreMetricData[typedKey] === undefined) {
             firestoreMetricData[typedKey] = null;
         }
-        if (typedKey === 'unit' && firestoreMetricData[typedKey] === undefined) {
-            firestoreMetricData[typedKey] = null;
-        }
-        if (typedKey === 'manualInputValueLastUpdated' && newCustomWidget.manualInputType !== 'hydration') {
-            firestoreMetricData[typedKey] = null;
-        }
     });
 
 
     try {
-        const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${finalCustomMetric.id}`);
+        const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${populatedCustomMetric.id}`);
         await setDoc(metricDocRef, firestoreMetricData);
+        toast({ title: "Custom Widget Added", description: `"${populatedCustomMetric.title}" has been added to your dashboard.`, iconType: "success" });
     } catch (error) {
         console.error("Error adding custom metric to Firestore:", error);
+        toast({ title: "Error", description: "Could not add custom widget.", variant: "destructive", iconType: "error" });
     }
 
     setIsCustomWidgetModalOpen(false);
@@ -986,9 +1071,6 @@ export default function DashboardPage() {
         if (firestoreCompatibleData[typedKey] === undefined) {
             firestoreCompatibleData[typedKey] = null;
         }
-         if (typedKey === 'unit' && firestoreCompatibleData[typedKey] === undefined) {
-            firestoreCompatibleData[typedKey] = null;
-        }
     });
 
     try {
@@ -996,8 +1078,9 @@ export default function DashboardPage() {
         await updateDoc(metricDocRef, firestoreCompatibleData);
     } catch (error) {
         console.error("Error updating metric in Firestore:", error);
+        toast({ title: "Update Error", description: `Could not update metric "${dashboardMetrics.find(m=>m.id===metricId)?.title}".`, variant: "destructive", iconType: "error" });
     }
-  }, [user?.id]);
+  }, [user?.id, dashboardMetrics]);
 
 
   const handleDeleteMetric = async (metricId: string) => {
@@ -1005,8 +1088,10 @@ export default function DashboardPage() {
     const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${metricId}`);
     try {
         await deleteDoc(metricDocRef);
+        toast({ title: "Widget Removed", description: "The widget has been removed from your dashboard.", iconType: "success" });
     } catch (error) {
         console.error("Error deleting metric from Firestore:", error);
+        toast({ title: "Deletion Error", description: "Could not remove widget.", variant: "destructive", iconType: "error" });
     }
   };
 
@@ -1053,7 +1138,7 @@ export default function DashboardPage() {
   const handleSaveManualInput = async (metricId: string, newValue: string | number) => {
     if(!user?.id) return;
 
-    let updatedMetricData: Partial<DashboardMetric> = { manualInputValueLastUpdated: serverTimestamp() };
+    let updatedMetricData: Partial<DashboardMetric> = { manualInputValueLastUpdated: serverTimestamp() as Timestamp };
     let mainMetricIdToUpdate = metricId;
 
     const originalMetric = dashboardMetrics.find(m => m.id === metricId || `${m.id}-goal-edit` === metricId || metricId.startsWith(`weight-for-calorie-tracker-${m.id.split('-').slice(0,-1).join('-')}`));
@@ -1073,9 +1158,9 @@ export default function DashboardPage() {
     } else if (metricId.startsWith('weight-for-calorie-tracker-')) {
         mainMetricIdToUpdate = metricId.replace('weight-for-calorie-tracker-', '');
         const weightToSave = Number(newValue);
-        await updateUserProfile({ weight: weightToSave }); 
-        setMetricToEdit(null); 
-        return;
+        await updateUserProfile({ weight: weightToSave });
+        setMetricToEdit(null);
+        return; 
     } else {
         const metricBeingEdited = dashboardMetrics.find(m=>m.id===metricId);
         if (!metricBeingEdited) {
@@ -1099,7 +1184,7 @@ export default function DashboardPage() {
             updatedMetricData.chartData = [{ name: metricBeingEdited.title, [metricBeingEdited.dataKey]: Number(newValue) || 0, fill: metricBeingEdited.chartData?.[0]?.fill || 'hsl(var(--primary))' }];
         }
         if (metricBeingEdited.id.startsWith('weight-') && !metricId.startsWith('weight-for-calorie-tracker-')) {
-             await updateUserProfile({ weight: Number(newValue) }); 
+             await updateUserProfile({ weight: Number(newValue) });
         }
     }
 
@@ -1111,17 +1196,16 @@ export default function DashboardPage() {
     if (!user?.id || isNaN(bmiValue)) return;
     try {
       const bmiHistoryCol = collection(db, `users/${user.id}/bmiHistory`);
-      const todayDateId = formatISO(startOfDay(new Date()), { representation: 'date' });
-      const newBmiEntryRef = doc(bmiHistoryCol, todayDateId); 
+      const newBmiEntryRef = doc(bmiHistoryCol); // Auto-generate ID
       await setDoc(newBmiEntryRef, {
-        date: new Date().toISOString(), 
+        date: new Date().toISOString(),
         bmi: bmiValue,
-      }, { merge: true }); 
-      fetchBmiHistory(); 
+      });
     } catch (error) {
       console.error("Error saving BMI to Firestore:", error);
     }
-  }, [user?.id, fetchBmiHistory]);
+  }, [user?.id]);
+
 
   const handleDataSourceChange = async (id: string, newSource: DataSource) => {
     if(!user?.id) return;
@@ -1137,7 +1221,7 @@ export default function DashboardPage() {
         value: populatedFullMetric.value,
         isDataAvailable: populatedFullMetric.isDataAvailable,
         manualInputValue: populatedFullMetric.manualInputValue,
-        manualInputValueLastUpdated: populatedFullMetric.manualInputType === 'hydration' ? serverTimestamp() : null
+        manualInputValueLastUpdated: populatedFullMetric.manualInputType === 'hydration' ? (serverTimestamp() as Timestamp) : null
     };
 
     const firestoreDataToSave : {[key: string]: any} = {...dataToSave, lastUpdated: serverTimestamp()};
@@ -1153,6 +1237,7 @@ export default function DashboardPage() {
         await updateDoc(metricDocRef, firestoreDataToSave);
     } catch (error) {
         console.error("Error updating data source in Firestore:", error);
+        toast({ title: "Error Updating Source", description: "Could not switch data source.", variant: "destructive", iconType: "error" });
     }
   };
 
@@ -1164,6 +1249,7 @@ export default function DashboardPage() {
         await updateDoc(metricDocRef, { size: newSize, lastUpdated: serverTimestamp() });
     } catch (error) {
         console.error("Error updating widget size in Firestore:", error);
+        toast({ title: "Resize Error", description: "Could not resize widget.", variant: "destructive", iconType: "error" });
     }
   };
 
@@ -1177,55 +1263,14 @@ export default function DashboardPage() {
         await updateDoc(metricDocRef, { show7DayGraph: newShow7DayGraph, lastUpdated: serverTimestamp() });
     } catch (error) {
         console.error("Error toggling 7-day graph in Firestore:", error);
+        toast({ title: "Graph Error", description: "Could not toggle graph view.", variant: "destructive", iconType: "error" });
     }
   };
 
-  const getMetricStyling = useCallback((metric: DashboardMetric): MetricStyling => {
-    let status: 'bad' | 'warning' | 'good' | 'neutral' = 'neutral';
-    let numericValue = NaN;
-    let iconClassBase = "text-primary";
-
-    if (metric.isDataAvailable) {
-        const valToParse = metric.manualInputValue !== undefined && metric.manualInputValue !== null && String(metric.manualInputValue).trim() !== '' && metric.type !== 'calorie-tracker' && metric.type !== 'bmi'
-                           ? metric.manualInputValue
-                           : (metric.type === 'bmi' ? metric.bmiValue : String(metric.value).split(' ')[0]);
-
-        if (typeof valToParse === 'number') numericValue = valToParse;
-        else if (typeof valToParse === 'string' && !isNaN(parseFloat(valToParse))) numericValue = parseFloat(valToParse);
-    }
-
-    if (metric.manualInputType === 'hydration' && !isNaN(numericValue)) {
-        if (numericValue < 3) status = 'bad'; else if (numericValue < 6) status = 'warning'; else status = 'good';
-    } else if (metric.manualInputType === 'steps' && !isNaN(numericValue)) {
-        if (numericValue < 2000) status = 'bad'; else if (numericValue < 5000) status = 'warning'; else status = 'good';
-    } else if (metric.manualInputType === 'sleep' && !isNaN(numericValue)) {
-        if (numericValue < 6) status = 'bad'; else if (numericValue < 7) status = 'warning'; else if (numericValue <= 9) status = 'good'; else status = 'warning';
-    } else if (metric.id.startsWith('hr-') && metric.isDataAvailable && !isNaN(numericValue)) {
-        if (numericValue < 50 || numericValue > 100) status = 'bad';
-        else if (numericValue < 60 || numericValue > 90) status = 'warning';
-        else status = 'good';
-    } else if (metric.id.startsWith('o2_sat-') && metric.isDataAvailable && !isNaN(numericValue)) {
-        if (numericValue < 90) status = 'bad';
-        else if (numericValue < 94) status = 'warning';
-        else status = 'good';
-    } else if (metric.type === 'bmi' && metric.bmiValue) {
-        if (metric.bmiValue < 18.5 || metric.bmiValue >= 30) status = 'bad';
-        else if (metric.bmiValue >= 25 && metric.bmiValue < 30) status = 'warning';
-        else if (metric.bmiValue >=18.5 && metric.bmiValue < 25) status = 'good';
-    }
-
-
-    switch (status) {
-        case 'bad': return { textClass: 'text-destructive', iconClass: 'text-destructive', statusIconName: 'AlertTriangle', statusIconClass: 'text-destructive' };
-        case 'warning': return { textClass: 'text-orange-500 dark:text-orange-400', iconClass: 'text-orange-500 dark:text-orange-400', statusIconName: 'AlertTriangle', statusIconClass: 'text-orange-500 dark:text-orange-400' };
-        case 'good': return { textClass: 'text-green-600 dark:text-green-400', iconClass: 'text-green-600 dark:text-green-400', statusIconName: 'CheckCircle2', statusIconClass: 'text-green-600 dark:text-green-400' };
-        default: return { textClass: 'text-foreground', iconClass: iconClassBase };
-    }
-  }, []);
 
 
   const handleAddMeal = useCallback(async (metricId: string, mealDescription: string) => {
-    if (!mealDescription.trim() || !user?.id) return; 
+    if (!mealDescription.trim() || !user?.id) return;
     setIsEstimatingCalories(true);
     try {
       const calorieWidget = dashboardMetrics.find(m=>m.id === metricId);
@@ -1239,9 +1284,9 @@ export default function DashboardPage() {
         aiSuggestedMealName: result.aiSuggestedMealName,
         estimatedCalories: result.estimatedCalories,
         macros: result.macros || { protein: 0, carbs: 0, fat: 0 },
-        healthinessNotes: result.healthinessNotes ?? null,
+        healthinessNotes: result.healthinessNotes === undefined ? null : result.healthinessNotes,
         healthinessScore: result.healthinessScore === undefined ? null : result.healthinessScore,
-        estimationNotes: result.estimationNotes ?? null,
+        estimationNotes: result.estimationNotes === undefined ? null : result.estimationNotes,
         timestamp: new Date().toISOString(),
       };
 
@@ -1254,8 +1299,8 @@ export default function DashboardPage() {
             value: `${totalCalories} / ${currentWidget.dailyCalorieGoal || (user?.dailyCalorieGoal || 2000)} kcal`,
             isDataAvailable: true,
         };
-        await handleUpdateMetric(metricId, updatedWidgetData);
-        await saveCurrentDayCalorieLogToFirestore(); 
+        await handleUpdateMetric(metricId, updatedWidgetData); 
+        await saveCurrentDayCalorieLogToFirestore();
       }
 
       let toastIcon: ToastVariantIcon = 'info';
@@ -1291,7 +1336,7 @@ export default function DashboardPage() {
     } finally {
         setIsEstimatingCalories(false);
     }
-  }, [user?.id, user?.dailyCalorieGoal, user?.weight, user?.age, user?.gender, dashboardMetrics, handleUpdateMetric, saveCurrentDayCalorieLogToFirestore, toast]);
+  }, [user?.id, user?.dailyCalorieGoal, user?.weight, user?.age, user?.gender, dashboardMetrics, handleUpdateMetric, saveCurrentDayCalorieLogToFirestore]);
 
   const handleRemoveMeal = useCallback(async (metricId: string, mealId: string) => {
      const currentWidget = dashboardMetrics.find(m => m.id === metricId);
@@ -1303,56 +1348,65 @@ export default function DashboardPage() {
               value: `${totalCalories} / ${currentWidget.dailyCalorieGoal || (user?.dailyCalorieGoal || 2000)} kcal`,
           };
           await handleUpdateMetric(metricId, updatedWidgetData);
-          await saveCurrentDayCalorieLogToFirestore(); 
+          await saveCurrentDayCalorieLogToFirestore();
       }
   }, [user?.dailyCalorieGoal, dashboardMetrics, handleUpdateMetric, saveCurrentDayCalorieLogToFirestore]);
 
  useEffect(() => {
-    if (user?.height && user?.weight && user.id) {
-      const heightM = user.height / 100;
-      const newBmi = parseFloat((user.weight / (heightM * heightM)).toFixed(1));
-  
-      setDashboardMetrics(prevMetrics => {
-        const updatedMetrics = prevMetrics.map(m => {
-          if (m.id.startsWith('bmi-')) {
-            const currentBmiMetric = m;
-            const populatedBmiMetric = populateMetricData({ ...currentBmiMetric, bmiValue: newBmi });
-  
-            if (populatedBmiMetric.bmiValue !== currentBmiMetric.bmiValue ||
-                populatedBmiMetric.bmiCategory !== currentBmiMetric.bmiCategory ||
-                !currentBmiMetric.isDataAvailable) {
-              
-              const firestoreUpdateData: Partial<DashboardMetric> = {
-                bmiValue: populatedBmiMetric.bmiValue,
-                bmiCategory: populatedBmiMetric.bmiCategory,
-                value: populatedBmiMetric.value,
-                isDataAvailable: true,
-              };
-              
-              const sanitizedFirestoreUpdateData: { [key: string]: any } = {};
-              Object.keys(firestoreUpdateData).forEach(key => {
-                  const typedKey = key as keyof typeof firestoreUpdateData;
-                  if (firestoreUpdateData[typedKey] === undefined) {
-                      sanitizedFirestoreUpdateData[typedKey] = null;
-                  } else {
-                      sanitizedFirestoreUpdateData[typedKey] = firestoreUpdateData[typedKey];
-                  }
-              });
-              handleUpdateMetric(currentBmiMetric.id, sanitizedFirestoreUpdateData);
-              return populatedBmiMetric;
-            }
-            return currentBmiMetric; 
+  if (user?.height && user?.weight && user.id) {
+    const heightM = user.height / 100;
+    const newBmi = parseFloat((user.weight / (heightM * heightM)).toFixed(1));
+
+    setDashboardMetrics(prevMetrics => {
+      let bmiMetricNeedsFirestoreUpdate = false;
+      let firestoreUpdateData: Partial<DashboardMetric> = {};
+
+      const updatedMetrics = prevMetrics.map(metric => {
+        if (metric.id.startsWith('bmi-')) {
+          const populatedBmiMetric = populateMetricData({ ...metric, bmiValue: newBmi, isDataAvailable: true });
+
+          if (populatedBmiMetric.bmiValue !== metric.bmiValue || populatedBmiMetric.bmiCategory !== metric.bmiCategory || !metric.isDataAvailable) {
+            firestoreUpdateData = {
+              bmiValue: populatedBmiMetric.bmiValue,
+              bmiCategory: populatedBmiMetric.bmiCategory,
+              value: populatedBmiMetric.value,
+              isDataAvailable: true,
+            };
+            bmiMetricNeedsFirestoreUpdate = true;
+            return populatedBmiMetric;
           }
-          return m;
-        });
-        return updatedMetrics;
+          return metric;
+        }
+        return metric;
       });
-      saveBmiReadingToFirestore(newBmi); 
-    }
-  }, [user?.height, user?.weight, user?.id, saveBmiReadingToFirestore, populateMetricData, handleUpdateMetric]);
+
+      if (bmiMetricNeedsFirestoreUpdate) {
+        const bmiWidget = updatedMetrics.find(m => m.id.startsWith('bmi-'));
+        if (bmiWidget) {
+           const { lastUpdated, ...dataToSave } = firestoreUpdateData;
+           const finalDataToSaveFirestore : {[key:string]: any} = {...dataToSave, lastUpdated: serverTimestamp()};
+
+           Object.keys(finalDataToSaveFirestore).forEach(key => {
+             const typedKey = key as keyof typeof finalDataToSaveFirestore;
+             if (finalDataToSaveFirestore[typedKey] === undefined) {
+               finalDataToSaveFirestore[typedKey] = null;
+             }
+           });
+           
+           const metricDocRef = doc(db, `users/${user.id}/dashboardMetrics/${bmiWidget.id}`);
+           updateDoc(metricDocRef, finalDataToSaveFirestore).catch(error => {
+             console.error("Error updating BMI metric in Firestore from effect:", error);
+           });
+           saveBmiReadingToFirestore(newBmi); 
+        }
+      }
+      return updatedMetrics;
+    });
+  }
+}, [user?.height, user?.weight, user?.id, saveBmiReadingToFirestore, populateMetricData]);
 
 
-  const renderMetricContent = (metric: DashboardMetric, onUpdateMetricProp: typeof handleUpdateMetric, onAddMealProp?: typeof handleAddMeal, onRemoveMealProp?: typeof handleRemoveMeal, calorieHistoryData?: StoredCalorieLog[], bmiHistoryData?: BmiHistoryEntry[]) => {
+  const renderMetricContent = (metric: DashboardMetric, onUpdateMetricProp: typeof handleUpdateMetric) => {
     const styling = getMetricStyling(metric);
 
     if (!metric.isDataAvailable && metric.currentDataSource !== 'manual' && metric.type !== 'manual-input' && metric.type !== 'bmi' && metric.type !== 'calorie-tracker' && metric.type !== 'ai-insight') {
@@ -1363,7 +1417,7 @@ export default function DashboardPage() {
         }
 
         return (
-            <div className="flex flex-col items-center justify-center h-full text-center p-3 space-y-2 glassmorphic-content">
+             <div className="flex flex-col items-center justify-center h-full text-center p-3 space-y-2">
                 <DatabaseZap className="h-10 w-10 text-muted-foreground/70 mb-1.5" />
                 <p className="text-xs font-medium text-muted-foreground">Data from {sourceText} unavailable.</p>
                 {actionButton}
@@ -1388,13 +1442,13 @@ export default function DashboardPage() {
         return <CalorieTrackerWidget
                   metric={metric}
                   user={user}
-                  onAddMeal={onAddMealProp!}
-                  onRemoveMeal={onRemoveMealProp!}
+                  onAddMeal={handleAddMeal}
+                  onRemoveMeal={handleRemoveMeal}
                   onEditMetric={contextHandleEditMetric}
                   isEstimatingCalories={isEstimatingCalories}
                   isCalorieHistoryModalOpen={isCalorieHistoryModalOpen}
                   setIsCalorieHistoryModalOpen={setIsCalorieHistoryModalOpen}
-                  calorieHistory={calorieHistoryData || []}
+                  calorieHistory={calorieHistory}
                />;
       case 'progress':
         return <ProgressWidget metric={metric} styling={styling} />;
@@ -1419,8 +1473,8 @@ export default function DashboardPage() {
   };
 
   const masonryColumnClasses = useMemo(() => {
-    if (isMobile) return "columns-1"; 
-    if (sidebarVisualState === 'expanded' && desktopBehavior === 'open') {
+    if (isMobile) return "columns-1";
+    if (!isMobile && sidebarVisualState === 'expanded' && desktopBehavior === 'open') {
       return "sm:columns-1 md:columns-2 lg:columns-3 xl:columns-3";
     }
     return "sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4";
@@ -1433,7 +1487,7 @@ export default function DashboardPage() {
   return (
     <DashboardPageLogicContext.Provider value={logic}>
     <div className="space-y-6 animate-fade-in overflow-x-hidden p-4 md:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className={cn("flex items-start justify-between gap-4", (sidebarVisualState === 'expanded' && desktopBehavior === 'open' && !isMobile) ? "flex-col sm:flex-row" : "flex-col sm:flex-row" )}>
         <div className="flex-1">
             <h1 className="text-3xl font-bold tracking-tight">Hello, {user?.name || 'User'}!</h1>
             <p className="text-xs text-muted-foreground mt-1 max-w-md">
@@ -1548,9 +1602,8 @@ export default function DashboardPage() {
 
       {!isFetchingMetrics && dashboardMetrics.length > 0 && (
         <div className={cn(
-            `transition-all duration-300 w-full`, 
-            dashboardLayout === 'square' ? 'dashboard-grid-square gap-4' : cn('dashboard-grid-masonry gap-4', masonryColumnClasses),
-            dashboardLayout === 'masonry' && "overflow-x-hidden"
+            `transition-all duration-300 w-full`,
+            dashboardLayout === 'square' ? 'dashboard-grid-square gap-4' : cn('dashboard-grid-masonry gap-4 overflow-x-hidden', masonryColumnClasses),
           )}>
           {dashboardMetrics.map((metric) => (
             <DashboardMetricCard
@@ -1584,7 +1637,7 @@ export default function DashboardPage() {
                 </ScrollArea>
                 <DialogModalFooter className="mt-auto">
                     <Button variant="outline" onClick={() => setIsFullChartModalOpen(false)}>Close</Button>
-                    <Button onClick={() => alert("PDF Download feature coming soon!")}><Download className="mr-2 h-4 w-4"/>Download Chart</Button>
+                    <Button onClick={() => toast({ title: "Coming Soon!", description: "PDF Download feature for the medical chart is under development.", iconType: "info"})}><Download className="mr-2 h-4 w-4"/>Download Chart</Button>
                 </DialogModalFooter>
             </DialogContent>
         </Dialog>
